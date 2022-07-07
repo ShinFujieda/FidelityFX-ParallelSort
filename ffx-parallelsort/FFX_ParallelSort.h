@@ -304,11 +304,11 @@
 	}
 
 	// Offset cache to avoid loading the offsets all the time
-	groupshared uint gs_FFX_PARALLELSORT_BinOffsetCache[FFX_PARALLELSORT_THREADGROUP_SIZE];
+	groupshared uint gs_FFX_PARALLELSORT_BinOffsetCache[FFX_PARALLELSORT_SORT_BIN_COUNT];
 	// Local histogram for offset calculations
 	groupshared uint gs_FFX_PARALLELSORT_LocalHistogram[FFX_PARALLELSORT_SORT_BIN_COUNT];
 	// Scratch area for algorithm
-	groupshared uint gs_FFX_PARALLELSORT_LDSScratch[FFX_PARALLELSORT_THREADGROUP_SIZE];
+	groupshared uint gs_FFX_PARALLELSORT_LDSScratch[FFX_PARALLELSORT_SORT_BIN_COUNT];
 	void FFX_ParallelSort_Scatter_uint(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit, RWStructuredBuffer<uint> SrcBuffer, RWStructuredBuffer<uint> DstBuffer, RWStructuredBuffer<uint> SumTable
 #ifdef kRS_ValueCopy
 										,RWStructuredBuffer<uint> SrcPayload, RWStructuredBuffer<uint> DstPayload
@@ -344,7 +344,7 @@
 		for (int BlockCount = 0; BlockCount < NumBlocksToProcess; BlockCount++, BlockIndex += BlockSize)
 		{
 			uint DataIndex = BlockIndex;
-			
+
 			// Pre-load the key values in order to hide some of the read latency
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
 			srcKeys[0] = SrcBuffer[DataIndex];
