@@ -112,6 +112,13 @@ void FPS_Scatter(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 								  ,SrcPayload, DstPayload
 #endif // kRS_ValueCopy
 	);
+
+	// 4-bit local sort
+// 	FFX_ParallelSort_Scatter_uint_4bit(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable
+// #ifdef kRS_ValueCopy
+// 								  ,SrcPayload, DstPayload
+// #endif // kRS_ValueCopy
+// 	);
 }
 
 [numthreads(1, 1, 1)]

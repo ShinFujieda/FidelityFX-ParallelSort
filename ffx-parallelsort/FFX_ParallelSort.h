@@ -19,6 +19,7 @@
 
 #define FFX_PARALLELSORT_SORT_BITS_PER_PASS		4
 #define	FFX_PARALLELSORT_SORT_BIN_COUNT			(1 << FFX_PARALLELSORT_SORT_BITS_PER_PASS)
+#define FFX_PARALLELSORT_SORT_BIN_PACKED		(FFX_PARALLELSORT_SORT_BIN_COUNT / 4)
 #define FFX_PARALLELSORT_ELEMENTS_PER_THREAD	4
 #define FFX_PARALLELSORT_THREADGROUP_SIZE		128
 
@@ -372,13 +373,14 @@
 #endif // kRS_ValueCopy
 
 				// Sort the keys locally in LDS
+				// Per 2 bits
 				for (uint bitShift = 0; bitShift < FFX_PARALLELSORT_SORT_BITS_PER_PASS; bitShift += 2)
 				{
 					// Figure out the keyIndex
 					uint keyIndex = (localKey >> ShiftBit) & 0xf;
 					uint bitKey = (keyIndex >> bitShift) & 0x3;
 
-					// Create a packed histogram 
+					// Create a packed histogram
 					uint packedHistogram = 1U << (bitKey * 8);
 
 					// Sum up all the packed keys (generates counted offsets up to current thread group)
@@ -507,6 +509,187 @@
 		ReduceScanArgs[0] = NumReducedThreadGroupsToRun;
 		ReduceScanArgs[1] = 1;
 		ReduceScanArgs[2] = 1;
+	}
+
+	// Local offsets
+	groupshared uint gs_FFX_PARALLELSORT_LDSKeys[FFX_PARALLELSORT_THREADGROUP_SIZE];
+#ifdef kRS_ValueCopy
+	groupshared uint gs_FFX_PARALLELSORT_LDSValues[FFX_PARALLELSORT_THREADGROUP_SIZE];
+#endif // kRS_ValueCopy
+	groupshared uint gs_FFX_PARALLELSORT_LDSHistogram[2][FFX_PARALLELSORT_SORT_BIN_COUNT];
+	void FFX_ParallelSort_Scatter_uint_4bit(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit, RWStructuredBuffer<uint> SrcBuffer, RWStructuredBuffer<uint> DstBuffer, RWStructuredBuffer<uint> SumTable
+#ifdef kRS_ValueCopy
+										,RWStructuredBuffer<uint> SrcPayload, RWStructuredBuffer<uint> DstPayload
+#endif // kRS_ValueCopy
+	)
+	{
+		// Load the sort bin threadgroup offsets into LDS for faster referencing
+		if (localID < FFX_PARALLELSORT_SORT_BIN_COUNT)
+			gs_FFX_PARALLELSORT_BinOffsetCache[localID] = SumTable[localID * CBuffer.NumThreadGroups + groupID];
+
+		// Wait for everyone to catch up
+		GroupMemoryBarrierWithGroupSync();
+
+		// Data is processed in blocks, and how many we process can changed based on how much data we are processing
+		// versus how many thread groups we are processing with
+		int BlockSize = FFX_PARALLELSORT_ELEMENTS_PER_THREAD * FFX_PARALLELSORT_THREADGROUP_SIZE;
+
+		// Figure out this thread group's index into the block data (taking into account thread groups that need to do extra reads)
+		uint ThreadgroupBlockStart = (BlockSize * CBuffer.NumBlocksPerThreadGroup * groupID);
+		uint NumBlocksToProcess = CBuffer.NumBlocksPerThreadGroup;
+
+		if (groupID >= CBuffer.NumThreadGroups - CBuffer.NumThreadGroupsWithAdditionalBlocks)
+		{
+			ThreadgroupBlockStart += (groupID - (CBuffer.NumThreadGroups - CBuffer.NumThreadGroupsWithAdditionalBlocks)) * BlockSize;
+			NumBlocksToProcess++;
+		}
+
+		// Get the block start index for this thread
+		uint BlockIndex = ThreadgroupBlockStart + localID;
+
+		// Count value occurences
+		for (int BlockCount = 0; BlockCount < NumBlocksToProcess; BlockCount++, BlockIndex += BlockSize)
+		{
+			uint DataIndex = BlockIndex;
+
+			// Pre-load the key values in order to hide some of the read latency
+			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
+			srcKeys[0] = SrcBuffer[DataIndex];
+			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+
+#ifdef kRS_ValueCopy
+			uint srcValues[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
+			srcValues[0] = SrcPayload[DataIndex];
+			srcValues[1] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			srcValues[2] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			srcValues[3] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+#endif // kRS_ValueCopy
+
+			// Sort the elements of the number of threads per loop locally on LDS
+			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+			{
+				uint localKey = (DataIndex < CBuffer.NumKeys) ? srcKeys[i] : 0xffffffff;
+#ifdef kRS_ValueCopy
+				uint localValue = (DataIndex < CBuffer.NumKeys) ? srcValues[i] : 0;
+#endif // kRS_ValueCopy
+
+				// Sort the keys locally in LDS
+				// Per 4 bits
+				{
+					// Figure out the keyIndex
+					// Each keyIndex is packed for each thread (FFX_PARALLELSORT_ELEMENTS_PER_THREAD) as
+					// packedHistogram = (sum3 | sum2 | sum1 | sum0) or (sum7 | sum6 | sum5 | sum4) or ...
+					uint packedHistogram = 0;
+
+					uint keyIndex = (localKey >> ShiftBit) & 0xf; // 0-15
+					uint packIdx = keyIndex / FFX_PARALLELSORT_SORT_BIN_PACKED;
+					uint idx = keyIndex % FFX_PARALLELSORT_SORT_BIN_PACKED;
+					packedHistogram = (1U << (idx * 8));
+
+					uint localOffsetPacked = 0;
+					for (int j = 0; j < FFX_PARALLELSORT_SORT_BIN_PACKED; j++)
+					{
+						// Sum up all the packed keys (generates counted offsets up to current thread)
+						uint partialPackedSum = (packIdx == j) ? packedHistogram : 0;
+						uint localSum = FFX_ParallelSort_BlockScanPrefix( partialPackedSum, localID );
+						if( packIdx == j )
+							localOffsetPacked = localSum;
+
+						// Last thread stores the updated histogram counts for the thread group
+						// packedSum = 0xsum3|sum2|sum1|sum0 for the thread group
+						if (localID == (FFX_PARALLELSORT_THREADGROUP_SIZE - 1))
+						{
+							uint packedSum = localSum + partialPackedSum;
+							for (int k = 0; k < FFX_PARALLELSORT_SORT_BIN_PACKED; k++)
+							{
+								uint partialSum = (packedSum >> (k * 8)) & 0xff;
+								uint idx = j * FFX_PARALLELSORT_SORT_BIN_PACKED + k;
+								gs_FFX_PARALLELSORT_LocalHistogram[idx] = partialSum;
+							}
+						}
+					}
+					// Wait for everyone to catch up
+					GroupMemoryBarrierWithGroupSync();
+
+					// FFX_ParallelSort_LDSScanExclusive( gs_FFX_PARALLELSORT_LocalHistogram, FFX_PARALLELSORT_SORT_BIN_COUNT, localID );
+					// Prefix histogram
+					uint histogramPrefixSum = WavePrefixSum(localID < FFX_PARALLELSORT_SORT_BIN_COUNT ? gs_FFX_PARALLELSORT_LocalHistogram[localID] : 0);
+
+					// Broadcast prefix-sum via LDS
+					if (localID < FFX_PARALLELSORT_SORT_BIN_COUNT)
+						gs_FFX_PARALLELSORT_LDSScratch[localID] = histogramPrefixSum;
+
+					// Wait for everyone to catch up
+					GroupMemoryBarrierWithGroupSync();
+
+					// Store sorted keys in LDS
+					uint localOffset = (localOffsetPacked >> (idx * 8)) & 0xff;
+					uint keyOffset = gs_FFX_PARALLELSORT_LDSScratch[keyIndex] + localOffset;
+
+					if( keyOffset < FFX_PARALLELSORT_THREADGROUP_SIZE )
+					{
+						gs_FFX_PARALLELSORT_LDSKeys[keyOffset] = localKey;
+#ifdef kRS_ValueCopy
+						uint localValue = (DataIndex < CBuffer.NumKeys) ? srcValues[i] : 0;
+						gs_FFX_PARALLELSORT_LDSValues[keyOffset] = localValue;
+#endif // kRS_ValueCopy
+					}
+				}
+
+				if( localID < FFX_PARALLELSORT_SORT_BIN_COUNT )
+				{
+					gs_FFX_PARALLELSORT_LDSHistogram[0][localID] = 0;
+					gs_FFX_PARALLELSORT_LDSHistogram[1][localID] = 0;
+				}
+				GroupMemoryBarrierWithGroupSync();
+
+				// Get the range of each bin
+				// gs_FFX_PARALLELSORT_LDSHistogram[0] stores the first index of each bin while gs_FFX_PARALLELSORT_LDSHistogram[1] stores the last index (+1) of each bin
+				uint a = localID;
+				uint aa = ( gs_FFX_PARALLELSORT_LDSKeys[a] >> ShiftBit ) & 0xf;
+				uint bb = ( ( ( a != 0 ) ? gs_FFX_PARALLELSORT_LDSKeys[a-1] : 0xffffffff ) >> ShiftBit ) & 0xf; // if a == 0, (a-1) gets -1 and it should be the boundary
+				if( aa != bb )
+				{
+					gs_FFX_PARALLELSORT_LDSHistogram[0][aa] = a; // low boundary
+					if( a != 0 )
+						gs_FFX_PARALLELSORT_LDSHistogram[1][bb] = a; // high boundary
+				}
+				if( localID == 0 )
+					gs_FFX_PARALLELSORT_LDSHistogram[1][(gs_FFX_PARALLELSORT_LDSKeys[FFX_PARALLELSORT_THREADGROUP_SIZE-1] >> ShiftBit) & 0xf] = FFX_PARALLELSORT_THREADGROUP_SIZE;
+
+				// Wait for everyone to catch up
+				GroupMemoryBarrierWithGroupSync();
+
+				// Re-arrange the keys
+				localKey = gs_FFX_PARALLELSORT_LDSKeys[localID];
+				uint keyIndex = (localKey >> ShiftBit) & 0xf; // 0-15
+				// Get the global offset for this key out of the cache
+				uint globalOffset = gs_FFX_PARALLELSORT_BinOffsetCache[keyIndex];
+				// Get the local offset
+				// uint localOffset = (localID * FFX_PARALLELSORT_ELEMENTS_PER_THREAD + i) - gs_FFX_PARALLELSORT_LDSHistogram[0][keyIndex];
+				uint localOffset = localID - gs_FFX_PARALLELSORT_LDSHistogram[0][keyIndex];
+				uint totalOffset = globalOffset + localOffset;
+
+				if (totalOffset < CBuffer.NumKeys)
+				{
+					DstBuffer[totalOffset] = localKey;
+#ifdef kRS_ValueCopy
+					DstPayload[totalOffset] = gs_FFX_PARALLELSORT_LDSValues[localID];
+#endif // kRS_ValueCopy
+				}
+
+				// Wait for everyone to catch up
+				GroupMemoryBarrierWithGroupSync();
+
+				// Update the cached histogram for the next set of entries
+				if (localID < FFX_PARALLELSORT_SORT_BIN_COUNT)
+					gs_FFX_PARALLELSORT_BinOffsetCache[localID] += (gs_FFX_PARALLELSORT_LDSHistogram[1][localID] - gs_FFX_PARALLELSORT_LDSHistogram[0][localID]);
+
+				DataIndex += FFX_PARALLELSORT_THREADGROUP_SIZE;	// Increase the data offset by thread group size
+			}
+		}
 	}
 
 #endif // __cplusplus
