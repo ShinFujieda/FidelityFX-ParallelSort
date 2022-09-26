@@ -41,31 +41,23 @@ struct RootConstantData {
 	ConstantBuffer<RootConstantData> rootConstData	: register(b2);										// Store the shift bit directly in the root signature
 #endif // VK_Const
 
-#ifdef kRS_ValueCopy
-[[vk::binding(0, 2)]] RWStructuredBuffer<uint64_t>	SrcBuffer		: register(u0, space0);					// The unsorted keys/payloads
-#else
-[[vk::binding(0, 2)]] RWStructuredBuffer<uint>	SrcBuffer		: register(u0, space0);					// The unsorted keys
-#endif // kRS_ValueCopy
-// [[vk::binding(2, 2)]] RWStructuredBuffer<uint>	SrcPayload		: register(u0, space1);					// The payload data
-
-[[vk::binding(0, 4)]] RWStructuredBuffer<uint>	SumTable		: register(u0, space1);					// The sum table we will write sums to
-[[vk::binding(1, 4)]] RWStructuredBuffer<uint>	ReduceTable		: register(u0, space2);					// The reduced sum table we will write sums to
-
-#ifdef kRS_ValueCopy
-[[vk::binding(1, 2)]] RWStructuredBuffer<uint64_t>	DstBuffer		: register(u0, space3);					// The sorted keys/payloads
-#else
-[[vk::binding(1, 2)]] RWStructuredBuffer<uint>	DstBuffer		: register(u0, space3);					// The sorted keys/payloads
-#endif // kRS_ValueCopy
-// [[vk::binding(3, 2)]] RWStructuredBuffer<uint>	DstPayload		: register(u0, space5);					// the sorted payload data
-
-[[vk::binding(0, 3)]] RWStructuredBuffer<uint>	ScanSrc			: register(u0, space4);					// Source for Scan Data
-[[vk::binding(1, 3)]] RWStructuredBuffer<uint>	ScanDst			: register(u0, space5);					// Destination for Scan Data
-[[vk::binding(2, 3)]] RWStructuredBuffer<uint>	ScanScratch		: register(u0, space6);					// Scratch data for Scan
-
-[[vk::binding(0, 5)]] RWStructuredBuffer<uint>	NumKeysBuffer	: register(u0, space7);					// Number of keys to sort for indirect execution
-[[vk::binding(1, 5)]] RWStructuredBuffer<FFX_ParallelSortCB>	CBufferUAV	: register(u0, space8);	// UAV for constant buffer parameters for indirect execution
-[[vk::binding(2, 5)]] RWStructuredBuffer<uint>	CountScatterArgs: register(u0, space9);				// Count and Scatter Args for indirect execution
-[[vk::binding(3, 5)]] RWStructuredBuffer<uint>	ReduceScanArgs	: register(u0, space10);				// Reduce and Scan Args for indirect execution
+[[vk::binding(0, 2)]] RWStructuredBuffer<uint>	SrcBuffer		: register(u0, space0);					// The unsorted keys or scan data
+[[vk::binding(2, 2)]] RWStructuredBuffer<uint>	SrcPayload		: register(u0, space1);					// The payload data
+				 
+[[vk::binding(0, 4)]] RWStructuredBuffer<uint>	SumTable		: register(u0, space2);					// The sum table we will write sums to
+[[vk::binding(1, 4)]] RWStructuredBuffer<uint>	ReduceTable		: register(u0, space3);					// The reduced sum table we will write sums to
+				 
+[[vk::binding(1, 2)]] RWStructuredBuffer<uint>	DstBuffer		: register(u0, space4);					// The sorted keys or prefixed data
+[[vk::binding(3, 2)]] RWStructuredBuffer<uint>	DstPayload		: register(u0, space5);					// the sorted payload data
+				 
+[[vk::binding(0, 3)]] RWStructuredBuffer<uint>	ScanSrc			: register(u0, space6);					// Source for Scan Data
+[[vk::binding(1, 3)]] RWStructuredBuffer<uint>	ScanDst			: register(u0, space7);					// Destination for Scan Data
+[[vk::binding(2, 3)]] RWStructuredBuffer<uint>	ScanScratch		: register(u0, space8);					// Scratch data for Scan
+				 
+[[vk::binding(0, 5)]] RWStructuredBuffer<uint>	NumKeysBuffer	: register(u0, space9);					// Number of keys to sort for indirect execution
+[[vk::binding(1, 5)]] RWStructuredBuffer<FFX_ParallelSortCB>	CBufferUAV	: register(u0, space10);	// UAV for constant buffer parameters for indirect execution
+[[vk::binding(2, 5)]] RWStructuredBuffer<uint>	CountScatterArgs: register(u0, space11);				// Count and Scatter Args for indirect execution
+[[vk::binding(3, 5)]] RWStructuredBuffer<uint>	ReduceScanArgs	: register(u0, space12);				// Reduce and Scan Args for indirect execution
 
 
 // FPS Count
@@ -115,16 +107,18 @@ void FPS_ScanAdd(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 [numthreads(FFX_PARALLELSORT_THREADGROUP_SIZE, 1, 1)]
 void FPS_Scatter(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 {
-// 	FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable
+	FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable
+#ifdef kRS_ValueCopy
+								  ,SrcPayload, DstPayload
+#endif // kRS_ValueCopy
+	);
+
+	// 4-bit local sort
+// 	FFX_ParallelSort_Scatter_uint_4bit(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable
 // #ifdef kRS_ValueCopy
 // 								  ,SrcPayload, DstPayload
 // #endif // kRS_ValueCopy
 // 	);
-
-	// FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
-
-	// 4-bit local sort
-	FFX_ParallelSort_Scatter_uint_4bit(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
 }
 
 [numthreads(1, 1, 1)]

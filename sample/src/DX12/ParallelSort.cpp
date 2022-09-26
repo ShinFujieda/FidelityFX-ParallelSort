@@ -27,7 +27,7 @@
 static const uint32_t NumKeys[] = { 1920 * 1080, 2560 * 1440, 3840 * 2160 };
 
 //////////////////////////////////////////////////////////////////////////
-
+    
 //////////////////////////////////////////////////////////////////////////
 // For doing command-line based benchmark runs
 int FFXParallelSort::KeySetOverride = -1;
@@ -43,23 +43,12 @@ void FFXParallelSort::OverridePayload()
 //////////////////////////////////////////////////////////////////////////
 
 // Create all of the sort data for the sample
-void FFXParallelSort::CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* keys, const uint32_t* payloads, uint32_t size)
-{
-    uint64_t* dst64 = (uint64_t*)dst;
-    for (uint32_t i = 0; i < size; i++)
-    {
-        uint64_t data = ((uint64_t)payloads[i] << 32) | (keys[i]);
-        dst64[i] = data;
-    }
-}
-
-// Create all of the sort data for the sample
 void FFXParallelSort::CreateKeyPayloadBuffers()
 {
     std::vector<uint32_t> KeyData1080(NumKeys[0]);
     std::vector<uint32_t> KeyData2K(NumKeys[1]);
     std::vector<uint32_t> KeyData4K(NumKeys[2]);
-
+                
     // Populate the buffers with linear access index
     std::iota(KeyData1080.begin(), KeyData1080.end(), 0);
     std::iota(KeyData2K.begin(), KeyData2K.end(), 0);
@@ -69,37 +58,25 @@ void FFXParallelSort::CreateKeyPayloadBuffers()
     std::shuffle(KeyData1080.begin(), KeyData1080.end(), std::mt19937{ std::random_device{}() });
     std::shuffle(KeyData2K.begin(), KeyData2K.end(), std::mt19937{ std::random_device{}() });
     std::shuffle(KeyData4K.begin(), KeyData4K.end(), std::mt19937{ std::random_device{}() });
-
+        
     // 1080p
     CD3DX12_RESOURCE_DESC ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint32_t) * NumKeys[0], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     m_SrcKeyBuffers[0].InitBuffer(m_pDevice, "SrcKeys1080", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_COPY_DEST);
-    ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint64_t) * NumKeys[0], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    m_SrcBuffers[0].InitBuffer(m_pDevice, "Src1080", &ResourceDesc, sizeof(uint64_t), D3D12_RESOURCE_STATE_COPY_DEST);
     // 2K
     ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint32_t) * NumKeys[1], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     m_SrcKeyBuffers[1].InitBuffer(m_pDevice, "SrcKeys2K", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_COPY_DEST);
-    ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint64_t) * NumKeys[1], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    m_SrcBuffers[1].InitBuffer(m_pDevice, "Src2K", &ResourceDesc, sizeof(uint64_t), D3D12_RESOURCE_STATE_COPY_DEST);
     // 4K
     ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint32_t) * NumKeys[2], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     m_SrcKeyBuffers[2].InitBuffer(m_pDevice, "SrcKeys4K", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_COPY_DEST);
-    // m_SrcPayloadBuffers.InitBuffer(m_pDevice, "SrcPayloadBuffer", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_COPY_DEST);
-    ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint64_t) * NumKeys[2], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    m_SrcBuffers[2].InitBuffer(m_pDevice, "Src4K", &ResourceDesc, sizeof(uint64_t), D3D12_RESOURCE_STATE_COPY_DEST);
-
+    m_SrcPayloadBuffers.InitBuffer(m_pDevice, "SrcPayloadBuffer", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_COPY_DEST);
+        
     // The DstKey and DstPayload buffers will be used as src/dst when sorting. A copy of the 
     // source key/payload will be copied into them before hand so we can keep our original values
     ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint32_t) * NumKeys[2], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     m_DstKeyBuffers[0].InitBuffer(m_pDevice, "DstKeyBuf0", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     m_DstKeyBuffers[1].InitBuffer(m_pDevice, "DstKeyBuf1", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    // m_DstPayloadBuffers[0].InitBuffer(m_pDevice, "DstPayloadBuf0", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    // m_DstPayloadBuffers[1].InitBuffer(m_pDevice, "DstPayloadBuf1", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-    // The DstBuffer will be used as src/dst when sorting key and payload.
-    // A copy of the source key/payload will be copied into them before hand so we can keep our original values
-    ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint64_t) * NumKeys[2], D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    m_DstBuffers[0].InitBuffer(m_pDevice, "DstKeyBuf0", &ResourceDesc, sizeof(uint64_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    m_DstBuffers[1].InitBuffer(m_pDevice, "DstKeyBuf1", &ResourceDesc, sizeof(uint64_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    m_DstPayloadBuffers[0].InitBuffer(m_pDevice, "DstPayloadBuf0", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    m_DstPayloadBuffers[1].InitBuffer(m_pDevice, "DstPayloadBuf1", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     // Copy data in
 
@@ -107,70 +84,50 @@ void FFXParallelSort::CreateKeyPayloadBuffers()
     uint8_t* pKeyDataBuffer = m_pUploadHeap->Suballocate(NumKeys[0] * sizeof(uint32_t), sizeof(uint32_t));
     memcpy(pKeyDataBuffer, KeyData1080.data() , sizeof(uint32_t) * NumKeys[0]);
     m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcKeyBuffers[0].GetResource(), 0, m_pUploadHeap->GetResource(), pKeyDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint32_t) * NumKeys[0]);
-    uint8_t* pDataBuffer = m_pUploadHeap->Suballocate(NumKeys[0] * sizeof(uint64_t), sizeof(uint64_t));
-    CreateInterleavedKeyPayload(pDataBuffer, KeyData1080.data(), KeyData1080.data(), NumKeys[0]); // Copy the 1k source data for payload (it doesn't matter what the payload is as we really only want it to measure cost of copying/sorting)
-    m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcBuffers[0].GetResource(), 0, m_pUploadHeap->GetResource(), pDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint64_t) * NumKeys[0]);
-
+        
     // 2K
     pKeyDataBuffer = m_pUploadHeap->Suballocate(NumKeys[1] * sizeof(uint32_t), sizeof(uint32_t));
     memcpy(pKeyDataBuffer, KeyData2K.data(), sizeof(uint32_t) * NumKeys[1]);
     m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcKeyBuffers[1].GetResource(), 0, m_pUploadHeap->GetResource(), pKeyDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint32_t) * NumKeys[1]);
-    pDataBuffer = m_pUploadHeap->Suballocate(NumKeys[1] * sizeof(uint64_t), sizeof(uint64_t));
-    CreateInterleavedKeyPayload(pDataBuffer, KeyData2K.data(), KeyData2K.data(), NumKeys[1]); // Copy the 2k source data for payload (it doesn't matter what the payload is as we really only want it to measure cost of copying/sorting)
-    m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcBuffers[1].GetResource(), 0, m_pUploadHeap->GetResource(), pDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint64_t) * NumKeys[1]);
-
+        
     // 4K
     pKeyDataBuffer = m_pUploadHeap->Suballocate(NumKeys[2] * sizeof(uint32_t), sizeof(uint32_t));
     memcpy(pKeyDataBuffer, KeyData4K.data(), sizeof(uint32_t) * NumKeys[2]);
     m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcKeyBuffers[2].GetResource(), 0, m_pUploadHeap->GetResource(), pKeyDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint32_t) * NumKeys[2]);
-    // uint8_t* pPayloadDataBuffer = m_pUploadHeap->Suballocate(NumKeys[2] * sizeof(uint32_t), sizeof(uint32_t));
-    // memcpy(pPayloadDataBuffer, KeyData4K.data(), sizeof(uint32_t) * NumKeys[2]);    // Copy the 4k source data for payload (it doesn't matter what the payload is as we really only want it to measure cost of copying/sorting)
-    // m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcPayloadBuffers.GetResource(), 0, m_pUploadHeap->GetResource(), pPayloadDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint32_t) * NumKeys[2]);
-    pDataBuffer = m_pUploadHeap->Suballocate(NumKeys[2] * sizeof(uint64_t), sizeof(uint64_t));
-    CreateInterleavedKeyPayload(pDataBuffer, KeyData4K.data(), KeyData4K.data(), NumKeys[2]); // Copy the 4k source data for payload (it doesn't matter what the payload is as we really only want it to measure cost of copying/sorting)
-    m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcBuffers[2].GetResource(), 0, m_pUploadHeap->GetResource(), pDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint64_t) * NumKeys[2]);
-
+    uint8_t* pPayloadDataBuffer = m_pUploadHeap->Suballocate(NumKeys[2] * sizeof(uint32_t), sizeof(uint32_t));
+    memcpy(pPayloadDataBuffer, KeyData4K.data(), sizeof(uint32_t) * NumKeys[2]);    // Copy the 4k source data for payload (it doesn't matter what the payload is as we really only want it to measure cost of copying/sorting)
+    m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_SrcPayloadBuffers.GetResource(), 0, m_pUploadHeap->GetResource(), pPayloadDataBuffer - m_pUploadHeap->BasePtr(), sizeof(uint32_t) * NumKeys[2]);
+        
 
     // Once we are done copying the data, put in barriers to transition the source resources to 
     // copy source (which is what they will stay for the duration of app runtime)
-    CD3DX12_RESOURCE_BARRIER Barriers[8] = { CD3DX12_RESOURCE_BARRIER::Transition(m_SrcKeyBuffers[2].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-                                                // CD3DX12_RESOURCE_BARRIER::Transition(m_SrcPayloadBuffers.GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcKeyBuffers[1].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcKeyBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcBuffers[2].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcBuffers[1].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
-
+    CD3DX12_RESOURCE_BARRIER Barriers[6] = { CD3DX12_RESOURCE_BARRIER::Transition(m_SrcKeyBuffers[2].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
+                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcPayloadBuffers.GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE),
+                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcKeyBuffers[1].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE), 
+                                                CD3DX12_RESOURCE_BARRIER::Transition(m_SrcKeyBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE), 
+                                                 
                                                 // Copy the data into the dst[0] buffers for use on first frame
                                                 CD3DX12_RESOURCE_BARRIER::Transition(m_DstKeyBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST),
-                                                // CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST),
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_DstBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
-    m_pUploadHeap->GetCommandList()->ResourceBarrier(8, Barriers);
+                                                CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
+    m_pUploadHeap->GetCommandList()->ResourceBarrier(6, Barriers);
 
     m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_DstKeyBuffers[0].GetResource(), 0, m_SrcKeyBuffers[m_UIResolutionSize].GetResource(), 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
-    // m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_DstPayloadBuffers[0].GetResource(), 0, m_SrcPayloadBuffers.GetResource(), 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
-    m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_DstBuffers[0].GetResource(), 0, m_SrcBuffers[m_UIResolutionSize].GetResource(), 0, sizeof(uint64_t) * NumKeys[m_UIResolutionSize]);
+    m_pUploadHeap->GetCommandList()->CopyBufferRegion(m_DstPayloadBuffers[0].GetResource(), 0, m_SrcPayloadBuffers.GetResource(), 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
 
     // Put the dst buffers back to UAVs for sort usage
     Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstKeyBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    // Barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    Barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    Barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     m_pUploadHeap->GetCommandList()->ResourceBarrier(2, Barriers);
 
     // Create UAVs
     m_SrcKeyBuffers[2].CreateBufferUAV(2, nullptr, &m_SrcKeyUAVTable);
     m_SrcKeyBuffers[1].CreateBufferUAV(1, nullptr, &m_SrcKeyUAVTable);
     m_SrcKeyBuffers[0].CreateBufferUAV(0, nullptr, &m_SrcKeyUAVTable);
-    // m_SrcPayloadBuffers.CreateBufferUAV(0, nullptr, &m_SrcPayloadUAV);
-    m_SrcBuffers[2].CreateBufferUAV(2, nullptr, &m_SrcUAVTable);
-    m_SrcBuffers[1].CreateBufferUAV(1, nullptr, &m_SrcUAVTable);
-    m_SrcBuffers[0].CreateBufferUAV(0, nullptr, &m_SrcUAVTable);
+    m_SrcPayloadBuffers.CreateBufferUAV(0, nullptr, &m_SrcPayloadUAV);
     m_DstKeyBuffers[0].CreateBufferUAV(0, nullptr, &m_DstKeyUAVTable);
     m_DstKeyBuffers[1].CreateBufferUAV(1, nullptr, &m_DstKeyUAVTable);
-    // m_DstPayloadBuffers[0].CreateBufferUAV(0, nullptr, &m_DstPayloadUAVTable);
-    // m_DstPayloadBuffers[1].CreateBufferUAV(1, nullptr, &m_DstPayloadUAVTable);
-    m_DstBuffers[0].CreateBufferUAV(0, nullptr, &m_DstUAVTable);
-    m_DstBuffers[1].CreateBufferUAV(1, nullptr, &m_DstUAVTable);
+    m_DstPayloadBuffers[0].CreateBufferUAV(0, nullptr, &m_DstPayloadUAVTable);
+    m_DstPayloadBuffers[1].CreateBufferUAV(1, nullptr, &m_DstPayloadUAVTable);
 }
 
 // Compile specified radix sort shader and create pipeline
@@ -207,15 +164,13 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
     if (KeySetOverride >= 0)
         m_UIResolutionSize = KeySetOverride;
     if (PayloadOverride)
-        m_UISortPayload = true;
+        m_UISortPayload = true; 
 
     // Allocate UAVs to use for data
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(3, &m_SrcKeyUAVTable);
-    // m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_SrcPayloadUAV);
-    m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(3, &m_SrcUAVTable);
+    m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_SrcPayloadUAV);
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(2, &m_DstKeyUAVTable);
-    // m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(2, &m_DstPayloadUAVTable);
-    m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(2, &m_DstUAVTable);
+    m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(2, &m_DstPayloadUAVTable);
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_FPSScratchUAV);
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_FPSReducedScratchUAV);
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_IndirectKeyCountsUAV);
@@ -252,7 +207,7 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
     uint32_t scratchBufferSize;
     uint32_t reducedScratchBufferSize;
     FFX_ParallelSort_CalculateScratchResourceSize(NumKeys[2], scratchBufferSize, reducedScratchBufferSize);
-
+        
     ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(scratchBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     m_FPSScratchBuffer.InitBuffer(m_pDevice, "Scratch", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     m_FPSScratchBuffer.CreateBufferUAV(0, nullptr, &m_FPSScratchUAV);
@@ -274,8 +229,8 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
 
     // Create root signature for Radix sort passes
     {
-        D3D12_DESCRIPTOR_RANGE descRange[13];
-        D3D12_ROOT_PARAMETER rootParams[14];
+        D3D12_DESCRIPTOR_RANGE descRange[15];
+        D3D12_ROOT_PARAMETER rootParams[16];
 
         // Constant buffer table (always have 1)
         descRange[0] = { D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
@@ -295,68 +250,68 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         rootParams[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[3].DescriptorTable = { 1, &descRange[2] };
 
-        // // ScrPayload (sort only)
-        // descRange[3] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 1, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
-        // rootParams[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        // rootParams[4].DescriptorTable = { 1, &descRange[3] };
-
-        // Scratch (sort only)
+        // ScrPayload (sort only)
         descRange[3] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 1, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[4].DescriptorTable = { 1, &descRange[3] };
 
-        // Scratch (reduced)
+        // Scratch (sort only)
         descRange[4] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 2, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[5].DescriptorTable = { 1, &descRange[4] };
 
-        // DstBuffer (sort or scan)
+        // Scratch (reduced)
         descRange[5] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 3, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[6].DescriptorTable = { 1, &descRange[5] };
 
-        // // DstPayload (sort only)
-        // descRange[7] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 5, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
-        // rootParams[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        // rootParams[8].DescriptorTable = { 1, &descRange[7] };
-
-        // ScanSrc
+        // DstBuffer (sort or scan)
         descRange[6] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 4, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[7].DescriptorTable = { 1, &descRange[6] };
 
-        // ScanDst
+        // DstPayload (sort only)
         descRange[7] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 5, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[8].DescriptorTable = { 1, &descRange[7] };
 
-        // ScanScratch
+        // ScanSrc
         descRange[8] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 6, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[9].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[9].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[9].DescriptorTable = { 1, &descRange[8] };
 
-        // NumKeys (indirect)
+        // ScanDst
         descRange[9] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 7, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[10].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[10].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[10].DescriptorTable = { 1, &descRange[9] };
 
-        // CBufferUAV (indirect)
+        // ScanScratch
         descRange[10] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 8, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[11].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[11].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[11].DescriptorTable = { 1, &descRange[10] };
 
-        // CountScatterArgs (indirect)
+        // NumKeys (indirect)
         descRange[11] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 9, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[12].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[12].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[12].DescriptorTable = { 1, &descRange[11] };
 
-        // ReduceScanArgs (indirect)
+        // CBufferUAV (indirect)
         descRange[12] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 10, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
         rootParams[13].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[13].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParams[13].DescriptorTable = { 1, &descRange[12] };
+            
+        // CountScatterArgs (indirect)
+        descRange[13] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 11, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
+        rootParams[14].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[14].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParams[14].DescriptorTable = { 1, &descRange[13] };
+            
+        // ReduceScanArgs (indirect)
+        descRange[14] = { D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 12, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND };
+        rootParams[15].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; rootParams[15].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParams[15].DescriptorTable = { 1, &descRange[14] };
 
         D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-        rootSigDesc.NumParameters = 14;
+        rootSigDesc.NumParameters = 16;
         rootSigDesc.pParameters = rootParams;
         rootSigDesc.NumStaticSamplers = 0;
         rootSigDesc.pStaticSamplers = nullptr;
@@ -422,7 +377,7 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
     // Create pipelines for radix sort
     {
         // Create all of the necessary pipelines for Sort and Scan
-
+        
         // SetupIndirectParams (indirect only)
         CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_SetupIndirectParameters", m_pFPSIndirectSetupParametersPipeline);
 
@@ -436,11 +391,10 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_ScanAdd", m_pFPSScanAddPipeline);
         // Radix scatter (key redistribution)
         CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_Scatter", m_pFPSScatterPipeline);
-
+        
         // Radix scatter with payload (key and payload redistribution)
         DefineList defines;
         defines["kRS_ValueCopy"] = std::to_string(1);
-        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Count", m_pFPSCountPayloadPipeline);
         CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Scatter", m_pFPSScatterPayloadPipeline);
     }
 
@@ -454,20 +408,12 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         std::string CompileFlagsVS("-T vs_6_0");
         std::string CompileFlagsPS("-T ps_6_0");
 #endif // _DEBUG
-
+        
         D3D12_SHADER_BYTECODE shaderByteCodeVS = {};
         CompileShaderFromFile("ParallelSortVerify.hlsl", nullptr, "FullscreenVS", CompileFlagsVS.c_str(), &shaderByteCodeVS);
 
         D3D12_SHADER_BYTECODE shaderByteCodePS = {};
-        if (!m_UISortPayload)
-            CompileShaderFromFile("ParallelSortVerify.hlsl", nullptr, "RenderSortValidationPS", CompileFlagsPS.c_str(), &shaderByteCodePS);
-        else
-        {
-            // Sorted with payload
-            DefineList defines;
-            defines["kRSV_Payload"] = std::to_string(1);
-            CompileShaderFromFile("ParallelSortVerify.hlsl", &defines, "RenderSortValidationPS", CompileFlagsPS.c_str(), &shaderByteCodePS);
-        }
+        CompileShaderFromFile("ParallelSortVerify.hlsl", nullptr, "RenderSortValidationPS", CompileFlagsPS.c_str(), &shaderByteCodePS);
 
         D3D12_GRAPHICS_PIPELINE_STATE_DESC descPso = {};
         descPso.InputLayout = { nullptr, 0 };
@@ -515,7 +461,6 @@ void FFXParallelSort::OnDestroy()
     m_FPSReducedScratchBuffer.OnDestroy();
     m_pFPSRootSignature->Release();
     m_pFPSCountPipeline->Release();
-    m_pFPSCountPayloadPipeline->Release();
     m_pFPSCountReducePipeline->Release();
     m_pFPSScanPipeline->Release();
     m_pFPSScanAddPipeline->Release();
@@ -526,16 +471,11 @@ void FFXParallelSort::OnDestroy()
     m_SrcKeyBuffers[0].OnDestroy();
     m_SrcKeyBuffers[1].OnDestroy();
     m_SrcKeyBuffers[2].OnDestroy();
-    // m_SrcPayloadBuffers.OnDestroy();
-    m_SrcBuffers[0].OnDestroy();
-    m_SrcBuffers[1].OnDestroy();
-    m_SrcBuffers[2].OnDestroy();
+    m_SrcPayloadBuffers.OnDestroy();
     m_DstKeyBuffers[0].OnDestroy();
     m_DstKeyBuffers[1].OnDestroy();
-    // m_DstPayloadBuffers[0].OnDestroy();
-    // m_DstPayloadBuffers[1].OnDestroy();
-    m_DstBuffers[0].OnDestroy();
-    m_DstBuffers[1].OnDestroy();
+    m_DstPayloadBuffers[0].OnDestroy();
+    m_DstPayloadBuffers[1].OnDestroy();
 }
 
 // This allows us to validate that the sorted data is actually in ascending order. Only used when doing algorithm changes.
@@ -552,7 +492,7 @@ void FFXParallelSort::CreateValidationResources(ID3D12GraphicsCommandList* pComm
     // And the fence for us to wait on
     ThrowIfFailed(m_pDevice->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_ReadBackFence)));
     m_ReadBackFence->SetName(L"Validation Read-back Fence");
-
+                
     // Transition, copy, and transition back
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pKeyDstInfo->pResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE));
     pCommandList->CopyBufferRegion(m_ReadBackBufferResource, 0, pKeyDstInfo->pResource, 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
@@ -583,7 +523,7 @@ void FFXParallelSort::WaitForValidationResults()
     m_ReadBackBufferResource->Map(0, &range, &pData);
 
     uint32_t* SortedData = (uint32_t*)pData;
-
+        
     // Do the validation
     uint32_t keysToValidate = NumKeys[m_UIResolutionSize];
     bool dataValid = true;
@@ -621,18 +561,15 @@ void FFXParallelSort::CopySourceDataForFrame(ID3D12GraphicsCommandList* pCommand
 
     // Copy the data into the dst[0] buffers for use on first frame
     CD3DX12_RESOURCE_BARRIER Barriers[2] = { CD3DX12_RESOURCE_BARRIER::Transition(m_DstKeyBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST),
-                                                // CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST)
-                                                CD3DX12_RESOURCE_BARRIER::Transition(m_DstBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
+                                                CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
     pCommandList->ResourceBarrier(2, Barriers);
 
     pCommandList->CopyBufferRegion(m_DstKeyBuffers[0].GetResource(), 0, m_SrcKeyBuffers[m_UIResolutionSize].GetResource(), 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
-    // pCommandList->CopyBufferRegion(m_DstPayloadBuffers[0].GetResource(), 0, m_SrcPayloadBuffers.GetResource(), 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
-    pCommandList->CopyBufferRegion(m_DstBuffers[0].GetResource(), 0, m_SrcBuffers[m_UIResolutionSize].GetResource(), 0, sizeof(uint64_t) * NumKeys[m_UIResolutionSize]);
+    pCommandList->CopyBufferRegion(m_DstPayloadBuffers[0].GetResource(), 0, m_SrcPayloadBuffers.GetResource(), 0, sizeof(uint32_t) * NumKeys[m_UIResolutionSize]);
 
     // Put the dst buffers back to UAVs for sort usage
     Barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstKeyBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    // Barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    Barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    Barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_DstPayloadBuffers[0].GetResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     pCommandList->ResourceBarrier(2, Barriers);
 }
 
@@ -672,17 +609,17 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         SetupIndirectCB IndirectSetupCB;
         IndirectSetupCB.NumKeysIndex = m_UIResolutionSize;
         IndirectSetupCB.MaxThreadGroups = m_MaxNumThreadgroups;
-
+            
         // Copy the data into the constant buffer
         D3D12_GPU_VIRTUAL_ADDRESS constantBuffer = m_pConstantBufferRing->AllocConstantBuffer(sizeof(SetupIndirectCB), &IndirectSetupCB);
         pCommandList->SetComputeRootConstantBufferView(1, constantBuffer);  // SetupIndirect Constant buffer
 
         // Bind other buffer
-        pCommandList->SetComputeRootDescriptorTable(10, m_IndirectKeyCountsUAV.GetGPU());           // Key counts
-        pCommandList->SetComputeRootDescriptorTable(11, m_IndirectConstantBufferUAV.GetGPU());      // Indirect Sort Constant Buffer
-        pCommandList->SetComputeRootDescriptorTable(12, m_IndirectCountScatterArgsUAV.GetGPU());    // Indirect Sort Count/Scatter Args
-        pCommandList->SetComputeRootDescriptorTable(13, m_IndirectReduceScanArgsUAV.GetGPU());      // Indirect Sort Reduce/Scan Args
-
+        pCommandList->SetComputeRootDescriptorTable(12, m_IndirectKeyCountsUAV.GetGPU());           // Key counts
+        pCommandList->SetComputeRootDescriptorTable(13, m_IndirectConstantBufferUAV.GetGPU());      // Indirect Sort Constant Buffer
+        pCommandList->SetComputeRootDescriptorTable(14, m_IndirectCountScatterArgsUAV.GetGPU());    // Indirect Sort Count/Scatter Args
+        pCommandList->SetComputeRootDescriptorTable(15, m_IndirectReduceScanArgsUAV.GetGPU());      // Indirect Sort Reduce/Scan Args
+            
         // Dispatch
         pCommandList->SetPipelineState(m_pFPSIndirectSetupParametersPipeline);
         pCommandList->Dispatch(1, 1, 1);
@@ -697,37 +634,22 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         pCommandList->ResourceBarrier(5, barriers);
     }
 
-    // // Setup resource/UAV pairs to use during sort
-    // RdxDX12ResourceInfo KeySrcInfo = { m_DstKeyBuffers[0].GetResource(), m_DstKeyUAVTable.GetGPU(0) };
-    // RdxDX12ResourceInfo PayloadSrcInfo = { m_DstPayloadBuffers[0].GetResource(), m_DstPayloadUAVTable.GetGPU(0) };
-    // RdxDX12ResourceInfo KeyTmpInfo = { m_DstKeyBuffers[1].GetResource(), m_DstKeyUAVTable.GetGPU(1) };
-    // RdxDX12ResourceInfo PayloadTmpInfo = { m_DstPayloadBuffers[1].GetResource(), m_DstPayloadUAVTable.GetGPU(1) };
-    // RdxDX12ResourceInfo ScratchBufferInfo = { m_FPSScratchBuffer.GetResource(), m_FPSScratchUAV.GetGPU() };
-    // RdxDX12ResourceInfo ReducedScratchBufferInfo = { m_FPSReducedScratchBuffer.GetResource(), m_FPSReducedScratchUAV.GetGPU() };
-
-    // // Buffers to ping-pong between when writing out sorted values
-    // const RdxDX12ResourceInfo* ReadBufferInfo(&KeySrcInfo), * WriteBufferInfo(&KeyTmpInfo);
-    // const RdxDX12ResourceInfo* ReadPayloadBufferInfo(&PayloadSrcInfo), * WritePayloadBufferInfo(&PayloadTmpInfo);
-    // bool bHasPayload = m_UISortPayload;
-
     // Setup resource/UAV pairs to use during sort
-    bool bHasPayload = m_UISortPayload;
-    RdxDX12ResourceInfo SrcInfo = { m_DstKeyBuffers[0].GetResource(), m_DstKeyUAVTable.GetGPU(0) };
-    RdxDX12ResourceInfo TmpInfo = { m_DstKeyBuffers[1].GetResource(), m_DstKeyUAVTable.GetGPU(1) };
-    if (bHasPayload)
-    {
-        SrcInfo = { m_DstBuffers[0].GetResource(), m_DstUAVTable.GetGPU(0) };
-        TmpInfo = { m_DstBuffers[1].GetResource(), m_DstUAVTable.GetGPU(1) };
-    }
+    RdxDX12ResourceInfo KeySrcInfo = { m_DstKeyBuffers[0].GetResource(), m_DstKeyUAVTable.GetGPU(0) };
+    RdxDX12ResourceInfo PayloadSrcInfo = { m_DstPayloadBuffers[0].GetResource(), m_DstPayloadUAVTable.GetGPU(0) };
+    RdxDX12ResourceInfo KeyTmpInfo = { m_DstKeyBuffers[1].GetResource(), m_DstKeyUAVTable.GetGPU(1) };
+    RdxDX12ResourceInfo PayloadTmpInfo = { m_DstPayloadBuffers[1].GetResource(), m_DstPayloadUAVTable.GetGPU(1) };
     RdxDX12ResourceInfo ScratchBufferInfo = { m_FPSScratchBuffer.GetResource(), m_FPSScratchUAV.GetGPU() };
     RdxDX12ResourceInfo ReducedScratchBufferInfo = { m_FPSReducedScratchBuffer.GetResource(), m_FPSReducedScratchUAV.GetGPU() };
 
     // Buffers to ping-pong between when writing out sorted values
-    const RdxDX12ResourceInfo* ReadBufferInfo(&SrcInfo), * WriteBufferInfo(&TmpInfo);
+    const RdxDX12ResourceInfo* ReadBufferInfo(&KeySrcInfo), * WriteBufferInfo(&KeyTmpInfo);
+    const RdxDX12ResourceInfo* ReadPayloadBufferInfo(&PayloadSrcInfo), * WritePayloadBufferInfo(&PayloadTmpInfo);
+    bool bHasPayload = m_UISortPayload;
 
     // Setup barriers for the run
     CD3DX12_RESOURCE_BARRIER barriers[3];
-
+        
     // Perform Radix Sort (currently only support 32-bit key/payload sorting
     for (uint32_t Shift = 0; Shift < 32u; Shift += FFX_PARALLELSORT_SORT_BITS_PER_PASS)
     {
@@ -743,13 +665,12 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
 
         // Bind to root signature
         pCommandList->SetComputeRootConstantBufferView(0, constantBuffer);                      // Constant buffer
-        pCommandList->SetComputeRootDescriptorTable(3, ReadBufferInfo->resourceGPUHandle);      // SrcBuffer
-        pCommandList->SetComputeRootDescriptorTable(4, ScratchBufferInfo.resourceGPUHandle);    // Scratch buffer
+        pCommandList->SetComputeRootDescriptorTable(3, ReadBufferInfo->resourceGPUHandle);      // SrcBuffer 
+        pCommandList->SetComputeRootDescriptorTable(5, ScratchBufferInfo.resourceGPUHandle);    // Scratch buffer
 
         // Sort Count
         {
-            // pCommandList->SetPipelineState(m_pFPSCountPipeline);
-            pCommandList->SetPipelineState(bHasPayload ? m_pFPSCountPayloadPipeline : m_pFPSCountPipeline);
+            pCommandList->SetPipelineState(m_pFPSCountPipeline);
 
             if (bIndirectDispatch)
             {
@@ -765,7 +686,7 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         barriers[0] = CD3DX12_RESOURCE_BARRIER::UAV(ScratchBufferInfo.pResource);
         pCommandList->ResourceBarrier(1, barriers);
 
-        pCommandList->SetComputeRootDescriptorTable(5, ReducedScratchBufferInfo.resourceGPUHandle); // Scratch reduce buffer
+        pCommandList->SetComputeRootDescriptorTable(6, ReducedScratchBufferInfo.resourceGPUHandle); // Scratch reduce buffer
 
         // Sort Reduce
         {
@@ -788,8 +709,8 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         // Sort Scan
         {
             // First do scan prefix of reduced values
-            pCommandList->SetComputeRootDescriptorTable(7, ReducedScratchBufferInfo.resourceGPUHandle);
-            pCommandList->SetComputeRootDescriptorTable(8, ReducedScratchBufferInfo.resourceGPUHandle);
+            pCommandList->SetComputeRootDescriptorTable(9, ReducedScratchBufferInfo.resourceGPUHandle);
+            pCommandList->SetComputeRootDescriptorTable(10, ReducedScratchBufferInfo.resourceGPUHandle);
 
             pCommandList->SetPipelineState(m_pFPSScanPipeline);
             if (!bIndirectDispatch)
@@ -803,9 +724,9 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
             pCommandList->ResourceBarrier(1, barriers);
 
             // Next do scan prefix on the histogram with partial sums that we just did
-            pCommandList->SetComputeRootDescriptorTable(7, ScratchBufferInfo.resourceGPUHandle);
-            pCommandList->SetComputeRootDescriptorTable(8, ScratchBufferInfo.resourceGPUHandle);
-            pCommandList->SetComputeRootDescriptorTable(9, ReducedScratchBufferInfo.resourceGPUHandle);
+            pCommandList->SetComputeRootDescriptorTable(9, ScratchBufferInfo.resourceGPUHandle);
+            pCommandList->SetComputeRootDescriptorTable(10, ScratchBufferInfo.resourceGPUHandle);
+            pCommandList->SetComputeRootDescriptorTable(11, ReducedScratchBufferInfo.resourceGPUHandle);
 
             pCommandList->SetPipelineState(m_pFPSScanAddPipeline);
             if (bIndirectDispatch)
@@ -822,13 +743,13 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         barriers[0] = CD3DX12_RESOURCE_BARRIER::UAV(ScratchBufferInfo.pResource);
         pCommandList->ResourceBarrier(1, barriers);
 
-        // if (bHasPayload)
-        // {
-        //     pCommandList->SetComputeRootDescriptorTable(4, ReadPayloadBufferInfo->resourceGPUHandle);   // ScrPayload
-        //     pCommandList->SetComputeRootDescriptorTable(8, WritePayloadBufferInfo->resourceGPUHandle);  // DstPayload
-        // }
+        if (bHasPayload)
+        {
+            pCommandList->SetComputeRootDescriptorTable(4, ReadPayloadBufferInfo->resourceGPUHandle);   // ScrPayload
+            pCommandList->SetComputeRootDescriptorTable(8, WritePayloadBufferInfo->resourceGPUHandle);  // DstPayload
+        }
 
-        pCommandList->SetComputeRootDescriptorTable(6, WriteBufferInfo->resourceGPUHandle);         // DstBuffer
+        pCommandList->SetComputeRootDescriptorTable(7, WriteBufferInfo->resourceGPUHandle);         // DstBuffer 
 
         // Sort Scatter
         {
@@ -843,18 +764,18 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
                 pCommandList->Dispatch(NumThreadgroupsToRun, 1, 1);
             }
         }
-
+            
         // Finish doing everything and barrier for the next pass
         int numBarriers = 0;
         barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::UAV(WriteBufferInfo->pResource);
-        // if (bHasPayload)
-        //     barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::UAV(WritePayloadBufferInfo->pResource);
+        if (bHasPayload)
+            barriers[numBarriers++] = CD3DX12_RESOURCE_BARRIER::UAV(WritePayloadBufferInfo->pResource);
         pCommandList->ResourceBarrier(numBarriers, barriers);
 
         // Swap read/write sources
         std::swap(ReadBufferInfo, WriteBufferInfo);
-        // if (bHasPayload)
-        //     std::swap(ReadPayloadBufferInfo, WritePayloadBufferInfo);
+        if (bHasPayload)
+            std::swap(ReadPayloadBufferInfo, WritePayloadBufferInfo);
     }
 
     // When we are all done, transition indirect buffers back to UAV for the next frame (if doing indirect dispatch)
@@ -933,12 +854,7 @@ void FFXParallelSort::DrawVisualization(ID3D12GraphicsCommandList* pCommandList,
         pCommandList->SetGraphicsRootDescriptorTable(1, m_SrcKeyUAVTable.GetGPU(m_UIResolutionSize));
     }
     else
-    {
-        if (!m_UISortPayload)
-            pCommandList->SetGraphicsRootDescriptorTable(1, m_DstKeyUAVTable.GetGPU(0));
-        else
-            pCommandList->SetGraphicsRootDescriptorTable(1, m_DstUAVTable.GetGPU(0));
-    }
+        pCommandList->SetGraphicsRootDescriptorTable(1, m_DstKeyUAVTable.GetGPU(0));
 
     // Bind validation texture
     pCommandList->SetGraphicsRootDescriptorTable(2, m_ValidateTextureSRV.GetGPU(m_UIResolutionSize));

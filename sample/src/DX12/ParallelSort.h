@@ -68,7 +68,6 @@ public:
     // Temp -- For command line overrides
 
 private:
-    void CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* key, const uint32_t* payload, uint32_t size);
     void CreateKeyPayloadBuffers();
     void CompileRadixPipeline(const char* shaderFile, const DefineList* defines, const char* entryPoint, ID3D12PipelineState*& pPipeline);
 #ifdef DEVELOPERMODE
@@ -85,42 +84,34 @@ private:
     ResourceViewHeaps*  m_pResourceViewHeaps = nullptr;
     DynamicBufferRing*  m_pConstantBufferRing = nullptr;
     uint32_t            m_MaxNumThreadgroups = 320; // Use a generic thread group size when not on AMD hardware (taken from experiments to determine best performance threshold)
-
-    // Sample resources for sorting only keys
+    
+    // Sample resources
     Texture             m_SrcKeyBuffers[3];     // 32 bit source key buffers (for 1080, 2K, 4K resolution)
     CBV_SRV_UAV         m_SrcKeyUAVTable;       // 32 bit source key UAVs (for 1080, 2K, 4K resolution)
 
-    // Texture             m_SrcPayloadBuffers;    // 32 bit source payload buffers
-    // CBV_SRV_UAV         m_SrcPayloadUAV;        // 32 bit source payload UAVs
+    Texture             m_SrcPayloadBuffers;    // 32 bit source payload buffers
+    CBV_SRV_UAV         m_SrcPayloadUAV;        // 32 bit source payload UAVs
 
     Texture             m_DstKeyBuffers[2];     // 32 bit destination key buffers (when not doing in place writes)
     CBV_SRV_UAV         m_DstKeyUAVTable;       // 32 bit destination key UAVs
 
-    // Texture             m_DstPayloadBuffers[2]; // 32 bit destination payload buffers (when not doing in place writes)
-    // CBV_SRV_UAV         m_DstPayloadUAVTable;   // 32 bit destination payload UAVs
-
-    // 64-bit sample resources for sorting key/payload
-    Texture             m_SrcBuffers[3];     // 64 bit source key/payload buffers (for 1080, 2K, 4K resolution)
-    CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAVs (for 1080, 2K, 4K resolution)
-
-    Texture             m_DstBuffers[2];     // 64 bit destination key/payload buffers (when not doing in place writes)
-    CBV_SRV_UAV         m_DstUAVTable;       // 64 bit destination key/payload UAVs
+    Texture             m_DstPayloadBuffers[2]; // 32 bit destination payload buffers (when not doing in place writes)
+    CBV_SRV_UAV         m_DstPayloadUAVTable;   // 32 bit destination payload UAVs
 
     // Resources         for parallel sort algorithm
     Texture             m_FPSScratchBuffer;             // Sort scratch buffer
     CBV_SRV_UAV         m_FPSScratchUAV;                // UAV needed for sort scratch buffer
     Texture             m_FPSReducedScratchBuffer;      // Sort reduced scratch buffer
     CBV_SRV_UAV         m_FPSReducedScratchUAV;         // UAV needed for sort reduced scratch buffer
-
+        
     ID3D12RootSignature* m_pFPSRootSignature            = nullptr;
     ID3D12PipelineState* m_pFPSCountPipeline            = nullptr;
-    ID3D12PipelineState* m_pFPSCountPayloadPipeline     = nullptr;
     ID3D12PipelineState* m_pFPSCountReducePipeline      = nullptr;
     ID3D12PipelineState* m_pFPSScanPipeline             = nullptr;
     ID3D12PipelineState* m_pFPSScanAddPipeline          = nullptr;
     ID3D12PipelineState* m_pFPSScatterPipeline          = nullptr;
     ID3D12PipelineState* m_pFPSScatterPayloadPipeline   = nullptr;
-
+        
     // Resources for indirect execution of algorithm
     Texture             m_IndirectKeyCounts;            // Buffer to hold num keys for indirect dispatch
     CBV_SRV_UAV         m_IndirectKeyCountsUAV;         // UAV needed for num keys buffer
@@ -130,10 +121,10 @@ private:
     CBV_SRV_UAV         m_IndirectCountScatterArgsUAV;  // UAV needed for count/scatter args buffer
     Texture             m_IndirectReduceScanArgs;       // Buffer to hold dispatch arguments used for Reduce/Scan parts of the algorithm
     CBV_SRV_UAV         m_IndirectReduceScanArgsUAV;    // UAV needed for reduce/scan args buffer
-
+        
     ID3D12CommandSignature* m_pFPSCommandSignature;
     ID3D12PipelineState*    m_pFPSIndirectSetupParametersPipeline = nullptr;
-
+        
     // Resources for verification render
     ID3D12RootSignature* m_pRenderRootSignature = nullptr;
     ID3D12PipelineState* m_pRenderResultVerificationPipeline = nullptr;

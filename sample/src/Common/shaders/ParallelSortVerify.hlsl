@@ -28,11 +28,7 @@
 	int CB_SortHeight;
 };
 
-#ifdef kRSV_Payload
-[[vk::binding(0, 1)]] RWStructuredBuffer<uint64_t>	SortBuffer			: register(u0, space0);
-#else
 [[vk::binding(0, 1)]] RWStructuredBuffer<uint>	SortBuffer			: register(u0, space0);
-#endif //kRSV_Payload
 [[vk::binding(0, 2)]] Texture2D<float4>			ValidationTexture	: register(t0, space0);
 
 struct VertexOut
@@ -60,21 +56,17 @@ float4 RenderSortValidationPS(VertexOut vertexIn) : SV_Target
 	// always aim to keep the results centered on screen (to account for users
 	// resizing the window, or dealing with sort size bigger than our current window)
 	int2 uvCoord = vertexIn.UVOut * int2(CB_Width, CB_Height);
-
+	
 	// xRes > sort width
 	int xStart, yStart;
 	xStart = (CB_Width - CB_SortWidth) / 2;		// Will be positive when screen width is larger than our key source, and negative when smaller
 	yStart = (CB_Height - CB_SortHeight) / 2;	// Will be positive when screen height is larger than our key source, and negative when smaller
-
+	
 	int2 lookupCoord = uvCoord.xy - int2(xStart, yStart);
 
 	if (lookupCoord.x >= 0 && lookupCoord.y >= 0 && lookupCoord.x < CB_SortWidth && lookupCoord.y < CB_SortHeight)
 	{
-#ifdef kRSV_Payload
-		int value = SortBuffer[lookupCoord.y * CB_SortWidth + lookupCoord.x] & 0xffffffff;
-#else
 		int value = SortBuffer[lookupCoord.y * CB_SortWidth + lookupCoord.x];
-#endif //kRSV_Payload
 
 		int height = value / CB_SortWidth;
 		int2 uv = int2(value - (height * CB_SortWidth), height);
