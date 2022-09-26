@@ -115,16 +115,10 @@ void FPS_ScanAdd(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 [numthreads(FFX_PARALLELSORT_THREADGROUP_SIZE, 1, 1)]
 void FPS_Scatter(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 {
-// 	FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable
-// #ifdef kRS_ValueCopy
-// 								  ,SrcPayload, DstPayload
-// #endif // kRS_ValueCopy
-// 	);
-
-	// FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
+	FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
 
 	// 4-bit local sort
-	FFX_ParallelSort_Scatter_uint_4bit(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
+	// FFX_ParallelSort_Scatter_uint_4bit(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
 }
 
 [numthreads(1, 1, 1)]

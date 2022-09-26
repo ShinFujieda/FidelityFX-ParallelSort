@@ -374,14 +374,6 @@
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 
-// #ifdef kRS_ValueCopy
-// 			uint srcValues[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-// 			srcValues[0] = SrcPayload[DataIndex];
-// 			srcValues[1] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-// 			srcValues[2] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-// 			srcValues[3] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
-// #endif // kRS_ValueCopy
-
 			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
 			{
 				// Clear the local histogram
@@ -428,24 +420,6 @@
 
 					// Calculate target offset
 					uint keyOffset = (localSum >> (bitKey * 8)) & 0xff;
-
-// 					// Re-arrange the keys (store, sync, load)
-// 					gs_FFX_PARALLELSORT_LDSSums[keyOffset] = localKey;
-// 					GroupMemoryBarrierWithGroupSync();
-// 					localKey = gs_FFX_PARALLELSORT_LDSSums[localID];
-
-// 					// Wait for everyone to catch up
-// 					GroupMemoryBarrierWithGroupSync();
-
-// #ifdef kRS_ValueCopy
-// 					// Re-arrange the values if we have them (store, sync, load)
-// 					gs_FFX_PARALLELSORT_LDSSums[keyOffset] = localValue;
-// 					GroupMemoryBarrierWithGroupSync();
-// 					localValue = gs_FFX_PARALLELSORT_LDSSums[localID];
-
-// 					// Wait for everyone to catch up
-// 					GroupMemoryBarrierWithGroupSync();
-// #endif // kRS_ValueCopy
 
 					// Re-arrange the keys/payloads (store, sync, load)
 					gs_FFX_PARALLELSORT_LDSSums[keyOffset] = localKey;
@@ -497,10 +471,6 @@
 #else
 					DstBuffer[totalOffset] = localKey;
 #endif
-
-// #ifdef kRS_ValueCopy
-// 					DstPayload[totalOffset] = localValue;
-// #endif // kRS_ValueCopy
 				}
 
 				// Wait for everyone to catch up
@@ -554,9 +524,6 @@
 
 	// Local offsets
 	groupshared uint gs_FFX_PARALLELSORT_LDSKeys[FFX_PARALLELSORT_THREADGROUP_SIZE];
-// #ifdef kRS_ValueCopy
-// 	groupshared uint gs_FFX_PARALLELSORT_LDSValues[FFX_PARALLELSORT_THREADGROUP_SIZE];
-// #endif // kRS_ValueCopy
 	groupshared uint gs_FFX_PARALLELSORT_LDSHistogram[2][FFX_PARALLELSORT_SORT_BIN_COUNT];
 	void FFX_ParallelSort_Scatter_uint_4bit(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit,
 #ifdef kRS_ValueCopy
@@ -606,14 +573,6 @@
 			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
-
-// #ifdef kRS_ValueCopy
-// 			uint srcValues[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-// 			srcValues[0] = SrcPayload[DataIndex];
-// 			srcValues[1] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-// 			srcValues[2] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-// 			srcValues[3] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
-// #endif // kRS_ValueCopy
 
 			// Sort the elements of the number of threads per loop locally on LDS
 			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
