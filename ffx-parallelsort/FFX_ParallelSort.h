@@ -99,13 +99,7 @@
 	};
 
 	groupshared uint gs_FFX_PARALLELSORT_Histogram[FFX_PARALLELSORT_THREADGROUP_SIZE * FFX_PARALLELSORT_SORT_BIN_COUNT];
-	void FFX_ParallelSort_Count_uint(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit,
-#ifdef kRS_ValueCopy
-									RWStructuredBuffer<uint64_t> SrcBuffer,
-#else
-									RWStructuredBuffer<uint> SrcBuffer,
-#endif // kRS_ValueCopy
-									RWStructuredBuffer<uint> SumTable)
+	void FFX_ParallelSort_Count_uint(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit,	RWStructuredBuffer<uint> SrcBuffer,	RWStructuredBuffer<uint> SumTable)
 	{
 		// Start by clearing our local counts in LDS
 		for (int i = 0; i < FFX_PARALLELSORT_SORT_BIN_COUNT; i++)
@@ -137,15 +131,18 @@
 			uint DataIndex = BlockIndex;
 
 			// Pre-load the key values in order to hide some of the read latency
-#ifdef kRS_ValueCopy
-			uint64_t srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-#else
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-#endif // kRS_ValueCopy
+#ifdef kRS_ValueCopy
+			srcKeys[0] = SrcBuffer[2*DataIndex];
+			srcKeys[1] = SrcBuffer[2*(DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE)];
+			srcKeys[2] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2))];
+			srcKeys[3] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3))];
+#else
 			srcKeys[0] = SrcBuffer[DataIndex];
 			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+#endif // kRS_ValueCopy
 
 			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
 			{
@@ -326,7 +323,7 @@
 #endif // kRS_ValueCopy
 	void FFX_ParallelSort_Scatter_uint(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit,
 #ifdef kRS_ValueCopy
-										RWStructuredBuffer<uint64_t> SrcBuffer, RWStructuredBuffer<uint64_t> DstBuffer,
+										RWStructuredBuffer<uint64_t> SrcBuffer64, RWStructuredBuffer<uint64_t> DstBuffer64,
 #else
 										RWStructuredBuffer<uint> SrcBuffer, RWStructuredBuffer<uint> DstBuffer,
 #endif // kRS_ValueCopy
@@ -366,13 +363,17 @@
 			// Pre-load the key values in order to hide some of the read latency
 #ifdef kRS_ValueCopy
 			uint64_t srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
+			srcKeys[0] = SrcBuffer64[DataIndex];
+			srcKeys[1] = SrcBuffer64[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			srcKeys[2] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			srcKeys[3] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #else
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-#endif // kRS_ValueCopy
 			srcKeys[0] = SrcBuffer[DataIndex];
 			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+#endif // kRS_ValueCopy
 
 			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
 			{
@@ -467,7 +468,7 @@
 				if (totalOffset < CBuffer.NumKeys)
 				{
 #ifdef kRS_ValueCopy
-					DstBuffer[totalOffset] = ((uint64_t)localValue << 32) | (localKey);
+					DstBuffer64[totalOffset] = ((uint64_t)localValue << 32) | (uint64_t)(localKey);
 #else
 					DstBuffer[totalOffset] = localKey;
 #endif

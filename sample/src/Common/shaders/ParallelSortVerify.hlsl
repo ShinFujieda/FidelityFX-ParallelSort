@@ -29,7 +29,7 @@
 };
 
 #ifdef kRSV_Payload
-[[vk::binding(0, 1)]] RWStructuredBuffer<uint64_t>	SortBuffer			: register(u0, space0);
+[[vk::binding(0, 1)]] RWStructuredBuffer<uint64_t>	SortBuffer64		: register(u0, space0);
 #else
 [[vk::binding(0, 1)]] RWStructuredBuffer<uint>	SortBuffer			: register(u0, space0);
 #endif //kRSV_Payload
@@ -71,7 +71,9 @@ float4 RenderSortValidationPS(VertexOut vertexIn) : SV_Target
 	if (lookupCoord.x >= 0 && lookupCoord.y >= 0 && lookupCoord.x < CB_SortWidth && lookupCoord.y < CB_SortHeight)
 	{
 #ifdef kRSV_Payload
-		int value = SortBuffer[lookupCoord.y * CB_SortWidth + lookupCoord.x] & 0xffffffff;
+		int value = SortBuffer64[lookupCoord.y * CB_SortWidth + lookupCoord.x] & 0xffffffff;
+		// int index = lookupCoord.y * CB_SortWidth + lookupCoord.x;
+		// int value = SortBuffer[2*index];
 #else
 		int value = SortBuffer[lookupCoord.y * CB_SortWidth + lookupCoord.x];
 #endif //kRSV_Payload

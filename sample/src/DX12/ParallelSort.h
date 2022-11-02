@@ -37,7 +37,8 @@ struct ParallelSortRenderCB // If you change this, also change struct ParallelSo
 typedef struct RdxDX12ResourceInfo
 {
     ID3D12Resource* pResource;          ///< Pointer to the resource -- used for barriers and syncs (must NOT be nullptr)
-    D3D12_GPU_DESCRIPTOR_HANDLE resourceGPUHandle;  ///< The GPU Descriptor Handle to use for binding the resource
+    D3D12_GPU_DESCRIPTOR_HANDLE resourceGPUHandle;  ///< The GPU Descriptor Handle to use for binding the resource with 32-bit stride
+    D3D12_GPU_DESCRIPTOR_HANDLE resourceGPUHandle64Bit;  ///< The GPU Descriptor Handle to use for binding the resource with 64-bit stride
 } RdxDX12ResourceInfo;
 
 namespace CAULDRON_DX12
@@ -104,7 +105,8 @@ private:
     CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAVs (for 1080, 2K, 4K resolution)
 
     Texture             m_DstBuffers[2];     // 64 bit destination key/payload buffers (when not doing in place writes)
-    CBV_SRV_UAV         m_DstUAVTable;       // 64 bit destination key/payload UAVs
+    CBV_SRV_UAV         m_Dst64UAVTable;       // 64 bit destination key/payload UAVs
+    CBV_SRV_UAV         m_Dst32UAVTable;     // 64 bit destination key/payload UAVs with 32-bit stride
 
     // Resources         for parallel sort algorithm
     Texture             m_FPSScratchBuffer;             // Sort scratch buffer
@@ -137,6 +139,7 @@ private:
     // Resources for verification render
     ID3D12RootSignature* m_pRenderRootSignature = nullptr;
     ID3D12PipelineState* m_pRenderResultVerificationPipeline = nullptr;
+    ID3D12PipelineState* m_pRenderResultVerificationPayloadPipeline = nullptr;
     Texture                 m_Validate4KTexture;
     Texture                 m_Validate2KTexture;
     Texture                 m_Validate1080pTexture;

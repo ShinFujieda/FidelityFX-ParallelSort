@@ -42,7 +42,8 @@ struct RootConstantData {
 #endif // VK_Const
 
 #ifdef kRS_ValueCopy
-[[vk::binding(0, 2)]] RWStructuredBuffer<uint64_t>	SrcBuffer		: register(u0, space0);					// The unsorted keys/payloads
+[[vk::binding(0, 2)]] RWStructuredBuffer<uint>	SrcBuffer			: register(u0, space0);					// The unsorted keys/payloads
+[[vk::binding(0, 2)]] RWStructuredBuffer<uint64_t>	SrcBuffer64		: register(u0, space0);					// The unsorted keys/payloads
 #else
 [[vk::binding(0, 2)]] RWStructuredBuffer<uint>	SrcBuffer		: register(u0, space0);					// The unsorted keys
 #endif // kRS_ValueCopy
@@ -52,7 +53,7 @@ struct RootConstantData {
 [[vk::binding(1, 4)]] RWStructuredBuffer<uint>	ReduceTable		: register(u0, space2);					// The reduced sum table we will write sums to
 
 #ifdef kRS_ValueCopy
-[[vk::binding(1, 2)]] RWStructuredBuffer<uint64_t>	DstBuffer		: register(u0, space3);					// The sorted keys/payloads
+[[vk::binding(1, 2)]] RWStructuredBuffer<uint64_t>	DstBuffer64		: register(u0, space3);					// The sorted keys/payloads
 #else
 [[vk::binding(1, 2)]] RWStructuredBuffer<uint>	DstBuffer		: register(u0, space3);					// The sorted keys/payloads
 #endif // kRS_ValueCopy
@@ -115,7 +116,11 @@ void FPS_ScanAdd(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 [numthreads(FFX_PARALLELSORT_THREADGROUP_SIZE, 1, 1)]
 void FPS_Scatter(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 {
+#ifdef kRS_ValueCopy
+	FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer64, DstBuffer64, SumTable);
+#else
 	FFX_ParallelSort_Scatter_uint(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
+#endif
 
 	// 4-bit local sort
 	// FFX_ParallelSort_Scatter_uint_4bit(localID, groupID, CBuffer, rootConstData.CShiftBit, SrcBuffer, DstBuffer, SumTable);
