@@ -20,7 +20,7 @@
 #define FFX_PARALLELSORT_SORT_BITS_PER_PASS		4
 #define	FFX_PARALLELSORT_SORT_BIN_COUNT			(1 << FFX_PARALLELSORT_SORT_BITS_PER_PASS)
 #define FFX_PARALLELSORT_SORT_BIN_PACKED		(FFX_PARALLELSORT_SORT_BIN_COUNT / 4)
-#define FFX_PARALLELSORT_ELEMENTS_PER_THREAD	4
+#define FFX_PARALLELSORT_ELEMENTS_PER_THREAD	3
 #define FFX_PARALLELSORT_THREADGROUP_SIZE		128
 
 //////////////////////////////////////////////////////////////////////////
@@ -85,7 +85,7 @@
 	}
 
 	// We are using some optimizations to hide buffer load latency, so make sure anyone changing this define is made aware of that fact.
-	static_assert(FFX_PARALLELSORT_ELEMENTS_PER_THREAD == 4, "FFX_ParallelSort Shaders currently explicitly rely on FFX_PARALLELSORT_ELEMENTS_PER_THREAD being set to 4 in order to optimize buffer loads. Please adjust the optimization to factor in the new define value.");
+	static_assert(FFX_PARALLELSORT_ELEMENTS_PER_THREAD == 3, "FFX_ParallelSort Shaders currently explicitly rely on FFX_PARALLELSORT_ELEMENTS_PER_THREAD being set to 3 in order to optimize buffer loads. Please adjust the optimization to factor in the new define value.");
 #elif defined(FFX_HLSL)
 
 	struct FFX_ParallelSortCB
@@ -136,12 +136,12 @@
 			srcKeys[0] = SrcBuffer[2*DataIndex];
 			srcKeys[1] = SrcBuffer[2*(DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE)];
 			srcKeys[2] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2))];
-			srcKeys[3] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3))];
+			// srcKeys[3] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3))];
 #else
 			srcKeys[0] = SrcBuffer[DataIndex];
 			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #endif // kRS_ValueCopy
 
 			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
@@ -366,13 +366,13 @@
 			srcKeys[0] = SrcBuffer64[DataIndex];
 			srcKeys[1] = SrcBuffer64[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-			srcKeys[3] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+			// srcKeys[3] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #else
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
 			srcKeys[0] = SrcBuffer[DataIndex];
 			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #endif // kRS_ValueCopy
 
 			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
@@ -573,7 +573,7 @@
 			srcKeys[0] = SrcBuffer[DataIndex];
 			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
 			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-			srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 
 			// Sort the elements of the number of threads per loop locally on LDS
 			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
