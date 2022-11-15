@@ -91,14 +91,8 @@ private:
     Texture             m_SrcKeyBuffers[3];     // 32 bit source key buffers (for 1080, 2K, 4K resolution)
     CBV_SRV_UAV         m_SrcKeyUAVTable;       // 32 bit source key UAVs (for 1080, 2K, 4K resolution)
 
-    // Texture             m_SrcPayloadBuffers;    // 32 bit source payload buffers
-    // CBV_SRV_UAV         m_SrcPayloadUAV;        // 32 bit source payload UAVs
-
     Texture             m_DstKeyBuffers[2];     // 32 bit destination key buffers (when not doing in place writes)
     CBV_SRV_UAV         m_DstKeyUAVTable;       // 32 bit destination key UAVs
-
-    // Texture             m_DstPayloadBuffers[2]; // 32 bit destination payload buffers (when not doing in place writes)
-    // CBV_SRV_UAV         m_DstPayloadUAVTable;   // 32 bit destination payload UAVs
 
     // 64-bit sample resources for sorting key/payload
     Texture             m_SrcBuffers[3];     // 64 bit source key/payload buffers (for 1080, 2K, 4K resolution)

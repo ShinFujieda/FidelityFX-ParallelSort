@@ -47,7 +47,6 @@ struct RootConstantData {
 #else
 [[vk::binding(0, 2)]] RWStructuredBuffer<uint>	SrcBuffer		: register(u0, space0);					// The unsorted keys
 #endif // kRS_ValueCopy
-// [[vk::binding(2, 2)]] RWStructuredBuffer<uint>	SrcPayload		: register(u0, space1);					// The payload data
 
 [[vk::binding(0, 4)]] RWStructuredBuffer<uint>	SumTable		: register(u0, space1);					// The sum table we will write sums to
 [[vk::binding(1, 4)]] RWStructuredBuffer<uint>	ReduceTable		: register(u0, space2);					// The reduced sum table we will write sums to
@@ -57,7 +56,6 @@ struct RootConstantData {
 #else
 [[vk::binding(1, 2)]] RWStructuredBuffer<uint>	DstBuffer		: register(u0, space3);					// The sorted keys/payloads
 #endif // kRS_ValueCopy
-// [[vk::binding(3, 2)]] RWStructuredBuffer<uint>	DstPayload		: register(u0, space5);					// the sorted payload data
 
 [[vk::binding(0, 3)]] RWStructuredBuffer<uint>	ScanSrc			: register(u0, space4);					// Source for Scan Data
 [[vk::binding(1, 3)]] RWStructuredBuffer<uint>	ScanDst			: register(u0, space5);					// Destination for Scan Data
