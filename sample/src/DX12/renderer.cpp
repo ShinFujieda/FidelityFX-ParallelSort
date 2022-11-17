@@ -57,7 +57,7 @@ void Renderer::OnCreate(Device* pDevice, SwapChain* pSwapChain, float FontSize)
     m_GPUTimer.OnCreate(pDevice, BackBufferCount);
 
     // Quick helper to upload resources, it has it's own commandList and uses sub-allocation.
-    const uint32_t uploadHeapMemSize = 200 * 1024 * 1024;
+    const uint32_t uploadHeapMemSize = 100 * 1024 * 1024;
     m_UploadHeap.OnCreate(pDevice, uploadHeapMemSize);    // initialize an upload heap (uses sub-allocation for faster results)
 
     // Initialize UI rendering resources
@@ -138,10 +138,12 @@ void Renderer::OnRender(const UIState* pState, SwapChain* pSwapChain, float Time
     // command buffer calls
     ID3D12GraphicsCommandList* pCmdLst1 = m_CommandListRing.GetNewCommandList();
     pCmdLst1->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pSwapChain->GetCurrentBackBufferResource(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    // m_GPUTimer.GetTimeStamp(pCmdLst1, "Begin Frame");
 
     // Copy the data to sort for the frame (don't time this -- external to process)
     m_ParallelSort.CopySourceDataForFrame(pCmdLst1);
     m_GPUTimer.GetTimeStamp(pCmdLst1, "Begin Frame");
+    // m_GPUTimer.GetTimeStamp(pCmdLst1, "Copy Data");
 
     // Do sort tests -----------------------------------------------------------------------
     m_ParallelSort.Sort(pCmdLst1, bIsBenchmarking, Time);
@@ -151,11 +153,6 @@ void Renderer::OnRender(const UIState* pState, SwapChain* pSwapChain, float Time
     ThrowIfFailed(pCmdLst1->Close());
     ID3D12CommandList* CmdListList1[] = { pCmdLst1 };
     m_pDevice->GetGraphicsQueue()->ExecuteCommandLists(1, CmdListList1);
-
-    // Check against parallel sort validation if needed (just returns if not needed)
-#ifdef DEVELOPERMODE
-    m_ParallelSort.WaitForValidationResults();
-#endif // DEVELOPERMODE
 
     // Wait for swapchain (we are going to render to it) -----------------------------------
     pSwapChain->WaitForSwapChain();

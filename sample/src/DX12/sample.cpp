@@ -107,7 +107,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             // Get the parameter
             int keySet = std::stoi(ArgList[CurrentArg + 1]);
             assert(keySet >= 0 && keySet < 3 && "Incorrect usage of -keyset <0-2>");
-            FFXParallelSort::OverrideKeySet(keySet);
+            // FFXParallelSort::OverrideKeySet(keySet);
             CurrentArg += 2;
         }
 

@@ -27,8 +27,6 @@ set(fidelityfx_sources
 
 set(common_sources
 	${CMAKE_CURRENT_SOURCE_DIR}/../Common/FFXParallelSort.json
-	${CMAKE_CURRENT_SOURCE_DIR}/../Common/Validate4K.png
-	${CMAKE_CURRENT_SOURCE_DIR}/../Common/Validate2K.png
 	${CMAKE_CURRENT_SOURCE_DIR}/../Common/Validate1080p.png)
 
 copyCommand("${shader_sources}" ${CMAKE_HOME_DIRECTORY}/bin/ShaderLibDX)

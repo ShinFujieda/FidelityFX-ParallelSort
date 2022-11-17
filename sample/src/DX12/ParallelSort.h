@@ -56,15 +56,11 @@ public:
     void OnDestroy();
 
     void Sort(ID3D12GraphicsCommandList* pCommandList, bool isBenchmarking, float benchmarkTime);
-#ifdef DEVELOPERMODE
-    void WaitForValidationResults();
-#endif // DEVELOPERMODE
     void CopySourceDataForFrame(ID3D12GraphicsCommandList* pCommandList);
     void DrawGui();
     void DrawVisualization(ID3D12GraphicsCommandList* pCommandList, uint32_t RTWidth, uint32_t RTHeight);
 
     // Temp -- For command line overrides
-    static void OverrideKeySet(int ResolutionOverride);
     static void OverridePayload();
     // Temp -- For command line overrides
 
@@ -72,12 +68,8 @@ private:
     void CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* key, const uint32_t* payload, uint32_t size);
     void CreateKeyPayloadBuffers();
     void CompileRadixPipeline(const char* shaderFile, const DefineList* defines, const char* entryPoint, ID3D12PipelineState*& pPipeline);
-#ifdef DEVELOPERMODE
-    void CreateValidationResources(ID3D12GraphicsCommandList* pCommandList, RdxDX12ResourceInfo* pKeyDstInfo);
-#endif // DEVELOPERMODE
 
     // Temp -- For command line overrides
-    static int KeySetOverride;
     static bool PayloadOverride;
     // Temp -- For command line overrides
 
@@ -88,68 +80,41 @@ private:
     uint32_t            m_MaxNumThreadgroups = 320; // Use a generic thread group size when not on AMD hardware (taken from experiments to determine best performance threshold)
 
     // Sample resources for sorting only keys
-    Texture             m_SrcKeyBuffers[3];     // 32 bit source key buffers (for 1080, 2K, 4K resolution)
-    CBV_SRV_UAV         m_SrcKeyUAVTable;       // 32 bit source key UAVs (for 1080, 2K, 4K resolution)
+    Texture             m_SrcKeyBuffer;     // 32 bit source key buffer
+    CBV_SRV_UAV         m_SrcKeyUAVTable;       // 32 bit source key UAV
 
-    Texture             m_DstKeyBuffers[2];     // 32 bit destination key buffers (when not doing in place writes)
+    Texture             m_DstKeyBuffer;     // 32 bit destination key buffer
     CBV_SRV_UAV         m_DstKeyUAVTable;       // 32 bit destination key UAVs
 
     // 64-bit sample resources for sorting key/payload
-    Texture             m_SrcBuffers[3];     // 64 bit source key/payload buffers (for 1080, 2K, 4K resolution)
-    CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAVs (for 1080, 2K, 4K resolution)
+    Texture             m_SrcBuffer;     // 64 bit source key/payload buffer
+    CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAV
 
-    Texture             m_DstBuffers[2];     // 64 bit destination key/payload buffers (when not doing in place writes)
+    Texture             m_DstBuffer;     // 64 bit destination key/payload buffer
     CBV_SRV_UAV         m_Dst64UAVTable;       // 64 bit destination key/payload UAVs
     CBV_SRV_UAV         m_Dst32UAVTable;     // 64 bit destination key/payload UAVs with 32-bit stride
 
     // Resources         for parallel sort algorithm
     Texture             m_FPSScratchBuffer;             // Sort scratch buffer
     CBV_SRV_UAV         m_FPSScratchUAV;                // UAV needed for sort scratch buffer
-    Texture             m_FPSReducedScratchBuffer;      // Sort reduced scratch buffer
-    CBV_SRV_UAV         m_FPSReducedScratchUAV;         // UAV needed for sort reduced scratch buffer
 
     ID3D12RootSignature* m_pFPSRootSignature            = nullptr;
     ID3D12PipelineState* m_pFPSCountPipeline            = nullptr;
     ID3D12PipelineState* m_pFPSCountPayloadPipeline     = nullptr;
-    ID3D12PipelineState* m_pFPSCountReducePipeline      = nullptr;
-    ID3D12PipelineState* m_pFPSScanPipeline             = nullptr;
-    ID3D12PipelineState* m_pFPSScanAddPipeline          = nullptr;
-    ID3D12PipelineState* m_pFPSScatterPipeline          = nullptr;
-    ID3D12PipelineState* m_pFPSScatterPayloadPipeline   = nullptr;
-
-    // Resources for indirect execution of algorithm
-    Texture             m_IndirectKeyCounts;            // Buffer to hold num keys for indirect dispatch
-    CBV_SRV_UAV         m_IndirectKeyCountsUAV;         // UAV needed for num keys buffer
-    Texture             m_IndirectConstantBuffer;       // Buffer to hold radix sort constant buffer data for indirect dispatch
-    CBV_SRV_UAV         m_IndirectConstantBufferUAV;    // UAV needed for indirect constant buffer
-    Texture             m_IndirectCountScatterArgs;     // Buffer to hold dispatch arguments used for Count/Scatter parts of the algorithm
-    CBV_SRV_UAV         m_IndirectCountScatterArgsUAV;  // UAV needed for count/scatter args buffer
-    Texture             m_IndirectReduceScanArgs;       // Buffer to hold dispatch arguments used for Reduce/Scan parts of the algorithm
-    CBV_SRV_UAV         m_IndirectReduceScanArgsUAV;    // UAV needed for reduce/scan args buffer
-
-    ID3D12CommandSignature* m_pFPSCommandSignature;
-    ID3D12PipelineState*    m_pFPSIndirectSetupParametersPipeline = nullptr;
 
     // Resources for verification render
     ID3D12RootSignature* m_pRenderRootSignature = nullptr;
     ID3D12PipelineState* m_pRenderResultVerificationPipeline = nullptr;
     ID3D12PipelineState* m_pRenderResultVerificationPayloadPipeline = nullptr;
-    Texture                 m_Validate4KTexture;
-    Texture                 m_Validate2KTexture;
-    Texture                 m_Validate1080pTexture;
+    Texture                 m_ValidateTexture;
     CBV_SRV_UAV             m_ValidateTextureSRV;
 
     // For correctness validation
     ID3D12Resource*         m_ReadBackBufferResource;           // For sort validation
     ID3D12Fence*            m_ReadBackFence;                    // To know when we can check sort results
     HANDLE                  m_ReadBackFenceEvent;
-#ifdef DEVELOPERMODE
-    bool                    m_UIValidateSortResults = false;    // Validate the results
-#endif // DEVELOPERMODE
 
     // Options for UI and test to run
     int m_UIResolutionSize = 0;
     bool m_UISortPayload = false;
-    bool m_UIIndirectSort = false;
-    int m_UIVisualOutput = 0;
 };
