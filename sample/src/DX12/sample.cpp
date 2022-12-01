@@ -118,6 +118,13 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             ++CurrentArg;
         }
 
+        // Set indirect sort
+        else if (!wideString.compare(L"-indirect"))
+        {
+            FFXParallelSort::OverrideIndirect();
+            ++CurrentArg;
+        }
+
         else
         {
             assert(false && "Unsupported command line parameter");

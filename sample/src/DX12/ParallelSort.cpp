@@ -40,6 +40,11 @@ void FFXParallelSort::OverridePayload()
 {
     PayloadOverride = true;
 }
+bool FFXParallelSort::IndirectOverride = false;
+void FFXParallelSort::OverrideIndirect()
+{
+    IndirectOverride = true;
+}
 //////////////////////////////////////////////////////////////////////////
 
 // Create all of the sort data for the sample
@@ -51,7 +56,6 @@ void FFXParallelSort::CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* 
     {
         dst32[2*i] = keys[i];
         dst32[2*i+1] = payloads[i];
-        // dst64[i] = ((uint64_t)payloads[i] << 32) | (uint64_t)(keys[i]);
     }
 }
 
@@ -199,6 +203,8 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         m_UIResolutionSize = KeySetOverride;
     if (PayloadOverride)
         m_UISortPayload = true;
+    if (IndirectOverride)
+        m_UIIndirectSort = true;
 
     // Allocate UAVs to use for data
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(3, &m_SrcKeyUAVTable);

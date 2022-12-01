@@ -66,6 +66,7 @@ public:
     // Temp -- For command line overrides
     static void OverrideKeySet(int ResolutionOverride);
     static void OverridePayload();
+    static void OverrideIndirect();
     // Temp -- For command line overrides
 
 private:
@@ -79,6 +80,7 @@ private:
     // Temp -- For command line overrides
     static int KeySetOverride;
     static bool PayloadOverride;
+    static bool IndirectOverride;
     // Temp -- For command line overrides
 
     Device*             m_pDevice = nullptr;
