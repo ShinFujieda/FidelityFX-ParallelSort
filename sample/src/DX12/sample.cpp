@@ -111,10 +111,17 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             CurrentArg += 2;
         }
 
-        // Set payload sort
+        // Set payload sort with interleaved 64-bit buffer of key and payload
         else if (!wideString.compare(L"-payload"))
         {
             FFXParallelSort::OverridePayload();
+            ++CurrentArg;
+        }
+
+        // Set payload sort with separated 32-bit buffer
+        else if (!wideString.compare(L"-payload32"))
+        {
+            FFXParallelSort::OverridePayload32();
             ++CurrentArg;
         }
 

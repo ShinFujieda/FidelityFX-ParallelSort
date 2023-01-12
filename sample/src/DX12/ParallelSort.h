@@ -66,6 +66,7 @@ public:
     // Temp -- For command line overrides
     static void OverrideKeySet(int ResolutionOverride);
     static void OverridePayload();
+    static void OverridePayload32();
     static void OverrideIndirect();
     // Temp -- For command line overrides
 
@@ -80,6 +81,7 @@ private:
     // Temp -- For command line overrides
     static int KeySetOverride;
     static bool PayloadOverride;
+    static bool Payload32Override;
     static bool IndirectOverride;
     // Temp -- For command line overrides
 
@@ -96,7 +98,14 @@ private:
     Texture             m_DstKeyBuffers[2];     // 32 bit destination key buffers (when not doing in place writes)
     CBV_SRV_UAV         m_DstKeyUAVTable;       // 32 bit destination key UAVs
 
-    // 64-bit sample resources for sorting key/payload
+    // Sample resources for sorting payload with separated 32-bit buffer
+    Texture             m_SrcPayloadBuffers;    // 32 bit source payload buffers
+    CBV_SRV_UAV         m_SrcPayloadUAV;        // 32 bit source payload UAVs
+
+    Texture             m_DstPayloadBuffers[2]; // 32 bit destination payload buffers (when not doing in place writes)
+    CBV_SRV_UAV         m_DstPayloadUAVTable;   // 32 bit destination payload UAVs
+
+    // Sample resources for sorting interleaved 64-bit key/payload
     Texture             m_SrcBuffers[3];     // 64 bit source key/payload buffers (for 1080, 2K, 4K resolution)
     CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAVs (for 1080, 2K, 4K resolution)
 
@@ -112,12 +121,13 @@ private:
 
     ID3D12RootSignature* m_pFPSRootSignature            = nullptr;
     ID3D12PipelineState* m_pFPSCountPipeline            = nullptr;
-    ID3D12PipelineState* m_pFPSCountPayloadPipeline     = nullptr;
+    ID3D12PipelineState* m_pFPSCountPayload64Pipeline     = nullptr;
     ID3D12PipelineState* m_pFPSCountReducePipeline      = nullptr;
     ID3D12PipelineState* m_pFPSScanPipeline             = nullptr;
     ID3D12PipelineState* m_pFPSScanAddPipeline          = nullptr;
     ID3D12PipelineState* m_pFPSScatterPipeline          = nullptr;
     ID3D12PipelineState* m_pFPSScatterPayloadPipeline   = nullptr;
+    ID3D12PipelineState* m_pFPSScatterPayload64Pipeline   = nullptr;
 
     // Resources for indirect execution of algorithm
     Texture             m_IndirectKeyCounts;            // Buffer to hold num keys for indirect dispatch
@@ -151,7 +161,7 @@ private:
 
     // Options for UI and test to run
     int m_UIResolutionSize = 0;
-    bool m_UISortPayload = false;
+    int m_UISortPayload = 0; // 0: disable, 1: 32 bit, 2: 64 bit
     bool m_UIIndirectSort = false;
     int m_UIVisualOutput = 0;
 };
