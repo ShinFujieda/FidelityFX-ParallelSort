@@ -50,6 +50,16 @@ void FFXParallelSort::OverrideIndirect()
 {
     IndirectOverride = true;
 }
+int FFXParallelSort::ElementPerThreadOverride = -1;
+void FFXParallelSort::OverrideElementPerThread(int n)
+{
+    ElementPerThreadOverride = n;
+}
+int FFXParallelSort::ThreadGroupSizeOverride = -1;
+void FFXParallelSort::OverrideThreadGroupSize(int n)
+{
+    ThreadGroupSizeOverride = n;
+}
 //////////////////////////////////////////////////////////////////////////
 
 // Create all of the sort data for the sample
@@ -225,6 +235,10 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         m_UISortPayload = 2;
     if (IndirectOverride)
         m_UIIndirectSort = true;
+    if (ElementPerThreadOverride >= 0)
+        m_ElementsPerThread = ElementPerThreadOverride;
+    if (ThreadGroupSizeOverride >= 0)
+        m_ThreadGroupSize = ThreadGroupSizeOverride;
 
     // Allocate UAVs to use for data
     m_pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(3, &m_SrcKeyUAVTable);
@@ -269,7 +283,8 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
     // Allocate the scratch buffers needed for radix sort
     uint32_t scratchBufferSize;
     uint32_t reducedScratchBufferSize;
-    FFX_ParallelSort_CalculateScratchResourceSize(NumKeys[2], scratchBufferSize, reducedScratchBufferSize);
+    uint32_t blockSize = m_ElementsPerThread * m_ThreadGroupSize;
+    FFX_ParallelSort_CalculateScratchResourceSize(NumKeys[2], blockSize, scratchBufferSize, reducedScratchBufferSize);
 
     ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(scratchBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     m_FPSScratchBuffer.InitBuffer(m_pDevice, "Scratch", &ResourceDesc, sizeof(uint32_t), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -440,27 +455,29 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
     // Create pipelines for radix sort
     {
         // Create all of the necessary pipelines for Sort and Scan
+        DefineList defines;
+        defines["FFX_PARALLELSORT_ELEMENTS_PER_THREAD"] = std::to_string(m_ElementsPerThread);
+        defines["FFX_PARALLELSORT_THREADGROUP_SIZE"] = std::to_string(m_ThreadGroupSize);
 
         // SetupIndirectParams (indirect only)
-        CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_SetupIndirectParameters", m_pFPSIndirectSetupParametersPipeline);
+        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_SetupIndirectParameters", m_pFPSIndirectSetupParametersPipeline);
 
         // Radix count (sum table generation)
-        CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_Count", m_pFPSCountPipeline);
+        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Count", m_pFPSCountPipeline);
         // Radix count reduce (sum table reduction for offset prescan)
-        CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_CountReduce", m_pFPSCountReducePipeline);
+        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_CountReduce", m_pFPSCountReducePipeline);
         // Radix scan (prefix scan)
-        CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_Scan", m_pFPSScanPipeline);
+        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Scan", m_pFPSScanPipeline);
         // Radix scan add (prefix scan + reduced prefix scan addition)
-        CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_ScanAdd", m_pFPSScanAddPipeline);
+        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_ScanAdd", m_pFPSScanAddPipeline);
         // Radix scatter (key redistribution)
-        CompileRadixPipeline("ParallelSortCS.hlsl", nullptr, "FPS_Scatter", m_pFPSScatterPipeline);
+        CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Scatter", m_pFPSScatterPipeline);
 
         // Radix scatter with payload (key and payload redistribution)
-        DefineList defines;
         defines["kRS_ValueCopy"] = std::to_string(1);
         CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Scatter", m_pFPSScatterPayloadPipeline);
 
-        defines.clear();
+        defines.erase("kRS_ValueCopy");
         defines["kRS_ValueCopy64"] = std::to_string(1);
         CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Count", m_pFPSCountPayload64Pipeline);
         CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_Scatter", m_pFPSScatterPayload64Pipeline);
@@ -705,7 +722,8 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
     if (!bIndirectDispatch)
     {
         uint32_t NumberOfKeys = NumKeys[m_UIResolutionSize];
-        FFX_ParallelSort_SetConstantAndDispatchData(NumberOfKeys, m_MaxNumThreadgroups, constantBufferData, NumThreadgroupsToRun, NumReducedThreadgroupsToRun);
+        uint32_t blockSize = m_ElementsPerThread * m_ThreadGroupSize;
+        FFX_ParallelSort_SetConstantAndDispatchData(NumberOfKeys, blockSize, m_MaxNumThreadgroups, constantBufferData, NumThreadgroupsToRun, NumReducedThreadgroupsToRun);
     }
     else
     {
@@ -829,7 +847,7 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
             pCommandList->SetPipelineState(m_pFPSScanPipeline);
             if (!bIndirectDispatch)
             {
-                assert(NumReducedThreadgroupsToRun < FFX_PARALLELSORT_ELEMENTS_PER_THREAD * FFX_PARALLELSORT_THREADGROUP_SIZE && "Need to account for bigger reduced histogram scan");
+                assert(NumReducedThreadgroupsToRun < m_ElementsPerThread * m_ThreadGroupSize && "Need to account for bigger reduced histogram scan");
             }
             pCommandList->Dispatch(1, 1, 1);
 

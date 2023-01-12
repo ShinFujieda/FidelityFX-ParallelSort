@@ -132,6 +132,26 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             ++CurrentArg;
         }
 
+        // Set block size with  and the number
+        // Number of elements per thread
+        else if (!wideString.compare(L"-element"))
+        {
+            assert(ArgCount > CurrentArg + 1 && "Incorrect usage of -element <uint>");
+            int nElements = std::stoi(ArgList[CurrentArg + 1]);
+            assert(nElements >= 0 && "Incorrect usage of -element <uint>");
+            FFXParallelSort::OverrideElementPerThread(nElements);
+            CurrentArg += 2;
+        }
+        // Thread group size
+        else if (!wideString.compare(L"-threadgroup"))
+        {
+            assert(ArgCount > CurrentArg + 1 && "Incorrect usage of -threadgroup <uint>");
+            int nThreadGroup = std::stoi(ArgList[CurrentArg + 1]);
+            assert(nThreadGroup >= 0 && "Incorrect usage of -threadgroup <uint>");
+            FFXParallelSort::OverrideThreadGroupSize(nThreadGroup);
+            CurrentArg += 2;
+        }
+
         else
         {
             assert(false && "Unsupported command line parameter");

@@ -68,6 +68,8 @@ public:
     static void OverridePayload();
     static void OverridePayload32();
     static void OverrideIndirect();
+    static void OverrideElementPerThread(int n);
+    static void OverrideThreadGroupSize(int n);
     // Temp -- For command line overrides
 
 private:
@@ -83,6 +85,8 @@ private:
     static bool PayloadOverride;
     static bool Payload32Override;
     static bool IndirectOverride;
+    static int ElementPerThreadOverride;
+    static int ThreadGroupSizeOverride;
     // Temp -- For command line overrides
 
     Device*             m_pDevice = nullptr;
@@ -164,4 +168,6 @@ private:
     int m_UISortPayload = 0; // 0: disable, 1: 32 bit, 2: 64 bit
     bool m_UIIndirectSort = false;
     int m_UIVisualOutput = 0;
+    int m_ElementsPerThread = 3;
+    int m_ThreadGroupSize = 128;
 };

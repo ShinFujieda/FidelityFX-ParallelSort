@@ -20,8 +20,8 @@
 #define FFX_PARALLELSORT_SORT_BITS_PER_PASS		4
 #define	FFX_PARALLELSORT_SORT_BIN_COUNT			(1 << FFX_PARALLELSORT_SORT_BITS_PER_PASS)
 #define FFX_PARALLELSORT_SORT_BIN_PACKED		(FFX_PARALLELSORT_SORT_BIN_COUNT / 4)
-#define FFX_PARALLELSORT_ELEMENTS_PER_THREAD	3
-#define FFX_PARALLELSORT_THREADGROUP_SIZE		128
+// #define FFX_PARALLELSORT_ELEMENTS_PER_THREAD	3
+// #define FFX_PARALLELSORT_THREADGROUP_SIZE		128
 
 //////////////////////////////////////////////////////////////////////////
 // ParallelSort constant buffer parameters:
@@ -46,9 +46,8 @@
 		uint32_t NumScanValues;
 	};
 
-	void FFX_ParallelSort_CalculateScratchResourceSize(uint32_t MaxNumKeys, uint32_t& ScratchBufferSize, uint32_t& ReduceScratchBufferSize)
+	void FFX_ParallelSort_CalculateScratchResourceSize(uint32_t MaxNumKeys, uint32_t BlockSize, uint32_t& ScratchBufferSize, uint32_t& ReduceScratchBufferSize)
 	{
-		uint32_t BlockSize = FFX_PARALLELSORT_ELEMENTS_PER_THREAD * FFX_PARALLELSORT_THREADGROUP_SIZE;
 		uint32_t NumBlocks = (MaxNumKeys + BlockSize - 1) / BlockSize;
 		uint32_t NumReducedBlocks = (NumBlocks + BlockSize - 1) / BlockSize;
 
@@ -56,11 +55,10 @@
 		ReduceScratchBufferSize = FFX_PARALLELSORT_SORT_BIN_COUNT * NumReducedBlocks * sizeof(uint32_t);
 	}
 
-	void FFX_ParallelSort_SetConstantAndDispatchData(uint32_t NumKeys, uint32_t MaxThreadGroups, FFX_ParallelSortCB& ConstantBuffer, uint32_t& NumThreadGroupsToRun, uint32_t& NumReducedThreadGroupsToRun)
+	void FFX_ParallelSort_SetConstantAndDispatchData(uint32_t NumKeys, uint32_t BlockSize, uint32_t MaxThreadGroups, FFX_ParallelSortCB& ConstantBuffer, uint32_t& NumThreadGroupsToRun, uint32_t& NumReducedThreadGroupsToRun)
 	{
 		ConstantBuffer.NumKeys = NumKeys;
 
-		uint32_t BlockSize = FFX_PARALLELSORT_ELEMENTS_PER_THREAD * FFX_PARALLELSORT_THREADGROUP_SIZE;
 		uint32_t NumBlocks = (NumKeys + BlockSize - 1) / BlockSize;
 
 		// Figure out data distribution
@@ -85,7 +83,7 @@
 	}
 
 	// We are using some optimizations to hide buffer load latency, so make sure anyone changing this define is made aware of that fact.
-	static_assert(FFX_PARALLELSORT_ELEMENTS_PER_THREAD == 3, "FFX_ParallelSort Shaders currently explicitly rely on FFX_PARALLELSORT_ELEMENTS_PER_THREAD being set to 3 in order to optimize buffer loads. Please adjust the optimization to factor in the new define value.");
+	// static_assert(FFX_PARALLELSORT_ELEMENTS_PER_THREAD == 3, "FFX_ParallelSort Shaders currently explicitly rely on FFX_PARALLELSORT_ELEMENTS_PER_THREAD being set to 3 in order to optimize buffer loads. Please adjust the optimization to factor in the new define value.");
 #elif defined(FFX_HLSL)
 
 	struct FFX_ParallelSortCB
@@ -133,14 +131,18 @@
 			// Pre-load the key values in order to hide some of the read latency
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
 #ifdef kRS_ValueCopy64
-			srcKeys[0] = SrcBuffer[2*DataIndex];
-			srcKeys[1] = SrcBuffer[2*(DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE)];
-			srcKeys[2] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2))];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcKeys[i] = SrcBuffer[2*(DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i)];
+			// srcKeys[0] = SrcBuffer[2*DataIndex];
+			// srcKeys[1] = SrcBuffer[2*(DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE)];
+			// srcKeys[2] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2))];
 			// srcKeys[3] = SrcBuffer[2*(DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3))];
 #else
-			srcKeys[0] = SrcBuffer[DataIndex];
-			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcKeys[i] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
+			// srcKeys[0] = SrcBuffer[DataIndex];
+			// srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			// srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #endif // kRS_ValueCopy64
 
@@ -366,23 +368,29 @@
 			// Pre-load the key values in order to hide some of the read latency
 #ifdef kRS_ValueCopy64
 			uint64_t srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-			srcKeys[0] = SrcBuffer64[DataIndex];
-			srcKeys[1] = SrcBuffer64[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-			srcKeys[2] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcKeys[i] = SrcBuffer64[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
+			// srcKeys[0] = SrcBuffer64[DataIndex];
+			// srcKeys[1] = SrcBuffer64[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			// srcKeys[2] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			// srcKeys[3] = SrcBuffer64[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #else
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-			srcKeys[0] = SrcBuffer[DataIndex];
-			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcKeys[i] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
+			// srcKeys[0] = SrcBuffer[DataIndex];
+			// srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			// srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #endif // kRS_ValueCopy64
 
 #ifdef kRS_ValueCopy
 			uint srcValues[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-			srcValues[0] = SrcPayload[DataIndex];
-			srcValues[1] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-			srcValues[2] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcValues[i] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
+			// srcValues[0] = SrcPayload[DataIndex];
+			// srcValues[1] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			// srcValues[2] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			// srcValues[3] = SrcPayload[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 #endif // kRS_ValueCopy
 
@@ -599,9 +607,11 @@
 #else
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
 #endif // kRS_ValueCopy64
-			srcKeys[0] = SrcBuffer[DataIndex];
-			srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-			srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcKeys[i] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
+			// srcKeys[0] = SrcBuffer[DataIndex];
+			// srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
+			// srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
 			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
 
 			// Sort the elements of the number of threads per loop locally on LDS
