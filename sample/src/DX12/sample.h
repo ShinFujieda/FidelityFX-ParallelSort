@@ -44,8 +44,17 @@ public:
 
 private:
     // Benchmarking support
+    struct BMSettings
+    {
+        int m_keySet = 0; // 0: 1k, 1: 2k, 2: 4k
+        int m_payload = 0; // 0: 32 bit, 1: 64 bit
+        bool m_indirect = false;
+        int m_elements = 3;
+        int m_threadSize = 128;
+    };
     bool        m_bIsBenchmarking;
     float       m_time;
+    BMSettings  m_bmSettings;
 
     Renderer*   m_pRenderer = NULL;
     UIState     m_UIState;

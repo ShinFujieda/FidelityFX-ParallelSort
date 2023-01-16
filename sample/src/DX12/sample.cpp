@@ -108,6 +108,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             int keySet = std::stoi(ArgList[CurrentArg + 1]);
             assert(keySet >= 0 && keySet < 3 && "Incorrect usage of -keyset <0-2>");
             FFXParallelSort::OverrideKeySet(keySet);
+            m_bmSettings.m_keySet = keySet;
             CurrentArg += 2;
         }
 
@@ -115,6 +116,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
         else if (!wideString.compare(L"-payload"))
         {
             FFXParallelSort::OverridePayload();
+            m_bmSettings.m_payload = 1;
             ++CurrentArg;
         }
 
@@ -122,6 +124,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
         else if (!wideString.compare(L"-payload32"))
         {
             FFXParallelSort::OverridePayload32();
+            m_bmSettings.m_payload = 0;
             ++CurrentArg;
         }
 
@@ -129,10 +132,11 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
         else if (!wideString.compare(L"-indirect"))
         {
             FFXParallelSort::OverrideIndirect();
+            m_bmSettings.m_indirect = true;
             ++CurrentArg;
         }
 
-        // Set block size with  and the number
+        // Set block size
         // Number of elements per thread
         else if (!wideString.compare(L"-element"))
         {
@@ -140,6 +144,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             int nElements = std::stoi(ArgList[CurrentArg + 1]);
             assert(nElements >= 0 && "Incorrect usage of -element <uint>");
             FFXParallelSort::OverrideElementPerThread(nElements);
+            m_bmSettings.m_elements = nElements;
             CurrentArg += 2;
         }
         // Thread group size
@@ -149,6 +154,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             int nThreadGroup = std::stoi(ArgList[CurrentArg + 1]);
             assert(nThreadGroup >= 0 && "Incorrect usage of -threadgroup <uint>");
             FFXParallelSort::OverrideThreadGroupSize(nThreadGroup);
+            m_bmSettings.m_threadSize = nThreadGroup;
             CurrentArg += 2;
         }
 
@@ -157,6 +163,22 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             assert(false && "Unsupported command line parameter");
             exit(0);
         }
+    }
+
+    // Change the output csv name accroding to settings
+    if (m_bIsBenchmarking)
+    {
+        json benchmark = m_jsonConfigFile["BenchmarkSettings"];
+        std::string resultsFilename = benchmark.value("resultsFilename", "res.csv");
+        int ext_i = resultsFilename.find_last_of(".");
+        std::string fileName = resultsFilename.substr(0, ext_i);
+        std::string extName = resultsFilename.substr(ext_i, resultsFilename.size() - ext_i);
+        const char* resolutions[] = { "1K", "2K", "4K" };
+        const char* payload[] = { "32bit", "64bit" };
+        resultsFilename = fileName + "_" + resolutions[m_bmSettings.m_keySet] + "_" + payload[m_bmSettings.m_payload] + "_" + std::to_string(m_bmSettings.m_elements) + "_" + std::to_string(m_bmSettings.m_threadSize)
+                        + (m_bmSettings.m_indirect ? "_indirect" : "") + extName;
+        benchmark["resultsFilename"] = resultsFilename;
+        m_jsonConfigFile["BenchmarkSettings"] = benchmark;
     }
 }
 
