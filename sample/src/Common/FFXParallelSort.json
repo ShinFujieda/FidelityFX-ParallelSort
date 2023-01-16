@@ -14,7 +14,7 @@
   "BenchmarkSettings": {
     "timeStep": 1,
     "timeStart": 0,
-    "timeEnd": 10,
+    "timeEnd": 4,
     "exitWhenTimeEnds": true,
     "resultsFilename": "FFXParallelSort.csv",
     "warmUpFrames": 500
