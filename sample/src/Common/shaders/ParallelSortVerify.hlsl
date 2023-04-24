@@ -72,8 +72,6 @@ float4 RenderSortValidationPS(VertexOut vertexIn) : SV_Target
 	{
 #ifdef kRSV_Payload
 		int value = SortBuffer64[lookupCoord.y * CB_SortWidth + lookupCoord.x] & 0xffffffff;
-		// int index = lookupCoord.y * CB_SortWidth + lookupCoord.x;
-		// int value = SortBuffer[2*index];
 #else
 		int value = SortBuffer[lookupCoord.y * CB_SortWidth + lookupCoord.x];
 #endif //kRSV_Payload
