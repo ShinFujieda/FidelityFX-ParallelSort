@@ -319,7 +319,7 @@
 	groupshared uint gs_FFX_PARALLELSORT_LocalHistogram[FFX_PARALLELSORT_SORT_BIN_COUNT];
 	// Scratch area for algorithm
 	groupshared uint gs_FFX_PARALLELSORT_LDSScratch[FFX_PARALLELSORT_SORT_BIN_COUNT];
-#ifdef kRS_ValueCopy64
+#if defined( kRS_ValueCopy64 ) || defined( kRS_ValueCopy )
 	// Store re-arranged payloads. Re-arranged keys are stored in gs_FFX_PARALLELSORT_LDSSums
 	groupshared uint gs_FFX_PARALLELSORT_LocalValueSort[FFX_PARALLELSORT_THREADGROUP_SIZE];
 #endif // kRS_ValueCopy64
@@ -331,7 +331,7 @@
 #endif // kRS_ValueCopy64
 										RWStructuredBuffer<uint> SumTable
 #ifdef kRS_ValueCopy
-										,RWStructuredBuffer<uint> SrcPayload, RWStructuredBuffer<uint> DstPayload
+										, RWStructuredBuffer<uint> SrcPayload, RWStructuredBuffer<uint> DstPayload
 #endif // kRS_ValueCopy
 	)
 	{
@@ -565,11 +565,14 @@
 	groupshared uint gs_FFX_PARALLELSORT_LDSHistogram[2][FFX_PARALLELSORT_SORT_BIN_COUNT];
 	void FFX_ParallelSort_Scatter_uint_4bit(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit,
 #ifdef kRS_ValueCopy64
-										RWStructuredBuffer<uint64_t> SrcBuffer, RWStructuredBuffer<uint64_t> DstBuffer,
+										RWStructuredBuffer<uint64_t> SrcBuffer64, RWStructuredBuffer<uint64_t> DstBuffer64,
 #else
 										RWStructuredBuffer<uint> SrcBuffer, RWStructuredBuffer<uint> DstBuffer,
 #endif // kRS_ValueCopy64
 										RWStructuredBuffer<uint> SumTable
+#ifdef kRS_ValueCopy
+										, RWStructuredBuffer<uint> SrcPayload, RWStructuredBuffer<uint> DstPayload
+#endif // kRS_ValueCopy
 	)
 	{
 		// Load the sort bin threadgroup offsets into LDS for faster referencing
@@ -604,15 +607,19 @@
 			// Pre-load the key values in order to hide some of the read latency
 #ifdef kRS_ValueCopy64
 			uint64_t srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcKeys[i] = SrcBuffer64[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
 #else
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-#endif // kRS_ValueCopy64
 			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
 				srcKeys[i] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
-			// srcKeys[0] = SrcBuffer[DataIndex];
-			// srcKeys[1] = SrcBuffer[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE];
-			// srcKeys[2] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 2)];
-			// srcKeys[3] = SrcBuffer[DataIndex + (FFX_PARALLELSORT_THREADGROUP_SIZE * 3)];
+#endif // kRS_ValueCopy64
+
+#ifdef kRS_ValueCopy
+			uint srcValues[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
+			for (uint i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
+				srcValues[i] = SrcPayload[DataIndex + FFX_PARALLELSORT_THREADGROUP_SIZE * i];
+#endif // kRS_ValueCopy
 
 			// Sort the elements of the number of threads per loop locally on LDS
 			for (int i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
@@ -623,6 +630,10 @@
 #else
 				uint localKey = (DataIndex < CBuffer.NumKeys ? srcKeys[i] : 0xffffffff);
 #endif // kRS_ValueCopy64
+
+#ifdef kRS_ValueCopy
+				uint localValue = (DataIndex < CBuffer.NumKeys ? srcValues[i] : 0);
+#endif // kRS_ValueCopy
 
 				// Sort the keys locally in LDS
 				// Per 4 bits
@@ -680,7 +691,7 @@
 					if( keyOffset < FFX_PARALLELSORT_THREADGROUP_SIZE )
 					{
 						gs_FFX_PARALLELSORT_LDSKeys[keyOffset] = localKey;
-#ifdef kRS_ValueCopy64
+#if defined( kRS_ValueCopy64 ) || defined( kRS_ValueCopy )
 						gs_FFX_PARALLELSORT_LocalValueSort[keyOffset] = localValue;
 #endif // kRS_ValueCopy64
 					}
@@ -724,10 +735,14 @@
 				{
 #ifdef kRS_ValueCopy64
 					localValue = gs_FFX_PARALLELSORT_LocalValueSort[localID];
-					DstBuffer[totalOffset] = ((uint64_t)localValue << 32) | (localKey);
+					DstBuffer64[totalOffset] = ((uint64_t)localValue << 32) | (uint64_t)(localKey);
 #else
 					DstBuffer[totalOffset] = localKey;
 #endif // kRS_ValueCopy64
+
+#ifdef kRS_ValueCopy
+					DstPayload[totalOffset] = gs_FFX_PARALLELSORT_LocalValueSort[localID];
+#endif
 				}
 
 				// Wait for everyone to catch up
