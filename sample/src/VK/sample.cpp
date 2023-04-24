@@ -154,7 +154,7 @@ void Sample::OnCreate()
     ImGUI_Init((void*)m_windowHwnd);
     m_UIState.Initialize();
 
-    OnResize();
+    OnResize(true);
     OnUpdateDisplay();
 }
 
@@ -210,7 +210,7 @@ bool Sample::OnEvent(MSG msg)
 // OnResize
 //
 //--------------------------------------------------------------------------------------
-void Sample::OnResize()
+void Sample::OnResize(bool resizeRender)
 {
     // Destroy resources (if we are not minimized)
     if (m_Width && m_Height && m_pRenderer)
@@ -275,7 +275,7 @@ void Sample::OnRender()
     // Do any start of frame necessities
     BeginFrame();
 
-    ImGUI_UpdateIO();
+    ImGUI_UpdateIO(m_Width, m_Height);
     ImGui::NewFrame();
 
     if (m_bIsBenchmarking)
