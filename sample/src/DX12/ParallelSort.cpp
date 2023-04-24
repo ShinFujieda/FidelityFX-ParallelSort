@@ -66,7 +66,6 @@ void FFXParallelSort::OverrideThreadGroupSize(int n)
 void FFXParallelSort::CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* keys, const uint32_t* payloads, uint32_t size)
 {
     uint32_t* dst32 = (uint32_t*)dst;
-    // uint64_t* dst64 = (uint64_t*)dst;
     for (uint32_t i = 0; i < size; i++)
     {
         dst32[2*i] = keys[i];
@@ -190,8 +189,8 @@ void FFXParallelSort::CreateKeyPayloadBuffers()
     m_DstKeyBuffers[1].CreateBufferUAV(1, nullptr, &m_DstKeyUAVTable);
     m_DstPayloadBuffers[0].CreateBufferUAV(0, nullptr, &m_DstPayloadUAVTable);
     m_DstPayloadBuffers[1].CreateBufferUAV(1, nullptr, &m_DstPayloadUAVTable);
-    m_DstBuffers[0].CreateBufferUAV(0, nullptr, &m_Dst64UAVTable, true);
-    m_DstBuffers[1].CreateBufferUAV(1, nullptr, &m_Dst64UAVTable, true);
+    m_DstBuffers[0].CreateBufferUAV(0, nullptr, &m_Dst64UAVTable, sizeof(uint64_t) / sizeof(uint32_t));
+    m_DstBuffers[1].CreateBufferUAV(1, nullptr, &m_Dst64UAVTable, sizeof(uint64_t) / sizeof(uint32_t));
     m_DstBuffers[0].CreateBufferUAV(0, nullptr, &m_Dst32UAVTable);
     m_DstBuffers[1].CreateBufferUAV(1, nullptr, &m_Dst32UAVTable);
 }
