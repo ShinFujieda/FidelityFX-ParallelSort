@@ -22,6 +22,7 @@
 
 #include <shellapi.h>
 #include <cassert>
+#include <regex>
 
 //--------------------------------------------------------------------------------------
 //
@@ -188,13 +189,39 @@ void Sample::OnCreate()
     m_pRenderer = new Renderer();
     m_pRenderer->OnCreate(&m_device, &m_swapChain, m_fontSize);
 
-    // set benchmarking state if enabled 
+    std::string deviceName;
+    std::string driverVersion;
+    m_device.GetDeviceInfo(&deviceName, &driverVersion);
+
+    // set benchmarking state if enabled
     if (m_bIsBenchmarking)
     {
-        std::string deviceName;
-        std::string driverVersion;
-        m_device.GetDeviceInfo(&deviceName, &driverVersion);
         BenchmarkConfig(m_jsonConfigFile["BenchmarkSettings"], -1, nullptr, deviceName, driverVersion);
+    }
+    else
+    {
+        // Overwrite the block size according to the GPU. These settings are chosen experimentally.
+        // For the older GPUs than Radeon RX 6800 or other venders' GPUs, we are using '4 * 256' as a block size by default.
+        DXGI_ADAPTER_DESC adapterDescription;
+        m_device.GetAdapter()->GetDesc(&adapterDescription);
+        if (adapterDescription.VendorId == 0x1002u) // AMD GPU
+        {
+            int deviceNumber = std::stoi(std::regex_replace(deviceName, std::regex("\\d+"), "$&", std::regex_constants::format_no_copy));
+            if (deviceNumber >= 6900) // 6900XT or newer
+            {
+                int nElementsPerThread = 4;
+                int nThreadGroupSize = 192;
+                FFXParallelSort::OverrideElementPerThread(nElementsPerThread);
+                FFXParallelSort::OverrideThreadGroupSize(nThreadGroupSize);
+            }
+            else if (deviceNumber >= 6800) // 6800 or 6800XT
+            {
+                int nElementsPerThread = 3;
+                int nThreadGroupSize = 128;
+                FFXParallelSort::OverrideElementPerThread(nElementsPerThread);
+                FFXParallelSort::OverrideThreadGroupSize(nThreadGroupSize);
+            }
+        }
     }
 
     // Init GUI (non gfx stuff)

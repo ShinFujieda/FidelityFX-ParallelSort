@@ -48,8 +48,8 @@ private:
     {
         int m_keySet = 0; // 0: 1k, 1: 2k, 2: 4k
         int m_payload = 0; // 0: 32 bit, 1: 64 bit
-        int m_elements = 3;
-        int m_threadSize = 128;
+        int m_elements = 4;
+        int m_threadSize = 256;
     };
     bool        m_bIsBenchmarking;
     float       m_time;
