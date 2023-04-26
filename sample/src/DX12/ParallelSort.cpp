@@ -60,7 +60,7 @@ void FFXParallelSort::OverrideThreadGroupSize(int n)
 // Create all of the sort data for the sample
 void FFXParallelSort::CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* keys, const uint32_t* payloads, uint32_t size)
 {
-    uint32_t* dst32 = (uint32_t*)dst;
+    uint32_t* dst32 = reinterpret_cast<uint32_t*>(dst);
     for (uint32_t i = 0; i < size; i++)
     {
         dst32[2*i] = keys[i];
@@ -950,8 +950,8 @@ void FFXParallelSort::DrawVisualization(ID3D12GraphicsCommandList* pCommandList,
     pCommandList->SetGraphicsRootDescriptorTable(2, m_ValidateTextureSRV.GetGPU(m_UIResolutionSize));
 
     D3D12_VIEWPORT vp = {};
-    vp.Width = (float)RTWidth;
-    vp.Height = (float)RTHeight;
+    vp.Width = static_cast<float>(RTWidth);
+    vp.Height = static_cast<float>(RTHeight);
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     vp.TopLeftX = vp.TopLeftY = 0.0f;

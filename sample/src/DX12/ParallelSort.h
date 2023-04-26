@@ -83,7 +83,6 @@ private:
     static int KeySetOverride;
     static bool PayloadOverride;
     static bool Payload32Override;
-    static bool IndirectOverride;
     static int ElementPerThreadOverride;
     static int ThreadGroupSizeOverride;
     // Temp -- For command line overrides
@@ -113,7 +112,7 @@ private:
     CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAVs (for 1080, 2K, 4K resolution)
 
     Texture             m_DstBuffers[2];     // 64 bit destination key/payload buffers (when not doing in place writes)
-    CBV_SRV_UAV         m_Dst64UAVTable;       // 64 bit destination key/payload UAVs
+    CBV_SRV_UAV         m_Dst64UAVTable;     // 64 bit destination key/payload UAVs
     CBV_SRV_UAV         m_Dst32UAVTable;     // 64 bit destination key/payload UAVs with 32-bit stride
 
     // Resources         for parallel sort algorithm

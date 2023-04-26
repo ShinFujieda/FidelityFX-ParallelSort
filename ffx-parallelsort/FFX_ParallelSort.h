@@ -20,8 +20,6 @@
 #define FFX_PARALLELSORT_SORT_BITS_PER_PASS		4
 #define	FFX_PARALLELSORT_SORT_BIN_COUNT			(1 << FFX_PARALLELSORT_SORT_BITS_PER_PASS)
 #define FFX_PARALLELSORT_SORT_BIN_PACKED		(FFX_PARALLELSORT_SORT_BIN_COUNT / 4)
-// #define FFX_PARALLELSORT_ELEMENTS_PER_THREAD	3
-// #define FFX_PARALLELSORT_THREADGROUP_SIZE		128
 
 //////////////////////////////////////////////////////////////////////////
 // ParallelSort constant buffer parameters:
@@ -81,9 +79,6 @@
 		ConstantBuffer.NumReduceThreadgroupPerBin = NumReducedThreadGroupsToRun / FFX_PARALLELSORT_SORT_BIN_COUNT;
 		ConstantBuffer.NumScanValues = NumReducedThreadGroupsToRun;	// The number of reduce thread groups becomes our scan count (as each thread group writes out 1 value that needs scan prefix)
 	}
-
-	// We are using some optimizations to hide buffer load latency, so make sure anyone changing this define is made aware of that fact.
-	// static_assert(FFX_PARALLELSORT_ELEMENTS_PER_THREAD == 3, "FFX_ParallelSort Shaders currently explicitly rely on FFX_PARALLELSORT_ELEMENTS_PER_THREAD being set to 3 in order to optimize buffer loads. Please adjust the optimization to factor in the new define value.");
 #elif defined(FFX_HLSL)
 
 	struct FFX_ParallelSortCB
