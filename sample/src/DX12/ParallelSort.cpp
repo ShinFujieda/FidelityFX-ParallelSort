@@ -890,11 +890,16 @@ void FFXParallelSort::DrawGui()
         ImGui::Checkbox("Sort Payload", &payload);
         if (payload)
         {
+            if (m_UISortPayload == 0)
+                m_UISortPayload = 1;
             ImGui::RadioButton("Sort Payload with 32 bit", &m_UISortPayload, 1);
             ImGui::RadioButton("Sort Payload with 64 bit", &m_UISortPayload, 2);
         }
         else
+        {
             m_UISortPayload = 0;
+        }
+
 #ifdef DEVELOPERMODE
         if (ImGui::Button("Validate Sort Results"))
             m_UIValidateSortResults = true;

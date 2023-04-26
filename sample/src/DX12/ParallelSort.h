@@ -165,7 +165,6 @@ private:
     // Options for UI and test to run
     int m_UIResolutionSize = 0;
     int m_UISortPayload = 0; // 0: disable, 1: 32 bit, 2: 64 bit
-    bool m_UIIndirectSort = false;
     int m_UIVisualOutput = 0;
     int m_ElementsPerThread = 3;
     int m_ThreadGroupSize = 128;
