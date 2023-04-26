@@ -57,7 +57,7 @@ void Renderer::OnCreate(Device* pDevice, SwapChain* pSwapChain, float FontSize)
     m_GPUTimer.OnCreate(pDevice, BackBufferCount);
 
     // Quick helper to upload resources, it has it's own commandList and uses sub-allocation.
-    const uint32_t uploadHeapMemSize = 200 * 1024 * 1024;
+    const uint32_t uploadHeapMemSize = 100 * 1024 * 1024;
     m_UploadHeap.OnCreate(pDevice, uploadHeapMemSize);    // initialize an upload heap (uses sub-allocation for faster results)
 
     // Initialize UI rendering resources

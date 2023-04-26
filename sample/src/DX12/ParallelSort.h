@@ -37,8 +37,7 @@ struct ParallelSortRenderCB // If you change this, also change struct ParallelSo
 typedef struct RdxDX12ResourceInfo
 {
     ID3D12Resource* pResource;          ///< Pointer to the resource -- used for barriers and syncs (must NOT be nullptr)
-    D3D12_GPU_DESCRIPTOR_HANDLE resourceGPUHandle;  ///< The GPU Descriptor Handle to use for binding the resource with 32-bit stride
-    D3D12_GPU_DESCRIPTOR_HANDLE resourceGPUHandle64Bit;  ///< The GPU Descriptor Handle to use for binding the resource with 64-bit stride
+    D3D12_GPU_DESCRIPTOR_HANDLE resourceGPUHandle;  ///< The GPU Descriptor Handle to use for binding the resource
 } RdxDX12ResourceInfo;
 
 namespace CAULDRON_DX12
@@ -66,13 +65,9 @@ public:
     // Temp -- For command line overrides
     static void OverrideKeySet(int ResolutionOverride);
     static void OverridePayload();
-    static void OverridePayload32();
-    static void OverrideElementPerThread(int n);
-    static void OverrideThreadGroupSize(int n);
     // Temp -- For command line overrides
 
 private:
-    void CreateInterleavedKeyPayload(uint8_t* dst, const uint32_t* key, const uint32_t* payload, uint32_t size);
     void CreateKeyPayloadBuffers();
     void CompileRadixPipeline(const char* shaderFile, const DefineList* defines, const char* entryPoint, ID3D12PipelineState*& pPipeline);
 #ifdef DEVELOPERMODE
@@ -82,9 +77,6 @@ private:
     // Temp -- For command line overrides
     static int KeySetOverride;
     static bool PayloadOverride;
-    static bool Payload32Override;
-    static int ElementPerThreadOverride;
-    static int ThreadGroupSizeOverride;
     // Temp -- For command line overrides
 
     Device*             m_pDevice = nullptr;
@@ -92,45 +84,34 @@ private:
     ResourceViewHeaps*  m_pResourceViewHeaps = nullptr;
     DynamicBufferRing*  m_pConstantBufferRing = nullptr;
     uint32_t            m_MaxNumThreadgroups = 320; // Use a generic thread group size when not on AMD hardware (taken from experiments to determine best performance threshold)
-
-    // Sample resources for sorting only keys
+    
+    // Sample resources
     Texture             m_SrcKeyBuffers[3];     // 32 bit source key buffers (for 1080, 2K, 4K resolution)
     CBV_SRV_UAV         m_SrcKeyUAVTable;       // 32 bit source key UAVs (for 1080, 2K, 4K resolution)
+
+    Texture             m_SrcPayloadBuffers;    // 32 bit source payload buffers
+    CBV_SRV_UAV         m_SrcPayloadUAV;        // 32 bit source payload UAVs
 
     Texture             m_DstKeyBuffers[2];     // 32 bit destination key buffers (when not doing in place writes)
     CBV_SRV_UAV         m_DstKeyUAVTable;       // 32 bit destination key UAVs
 
-    // Sample resources for sorting payload with separated 32-bit buffer
-    Texture             m_SrcPayloadBuffers;    // 32 bit source payload buffers
-    CBV_SRV_UAV         m_SrcPayloadUAV;        // 32 bit source payload UAVs
-
     Texture             m_DstPayloadBuffers[2]; // 32 bit destination payload buffers (when not doing in place writes)
     CBV_SRV_UAV         m_DstPayloadUAVTable;   // 32 bit destination payload UAVs
-
-    // Sample resources for sorting interleaved 64-bit key/payload
-    Texture             m_SrcBuffers[3];     // 64 bit source key/payload buffers (for 1080, 2K, 4K resolution)
-    CBV_SRV_UAV         m_SrcUAVTable;       // 64 bit source key/payload UAVs (for 1080, 2K, 4K resolution)
-
-    Texture             m_DstBuffers[2];     // 64 bit destination key/payload buffers (when not doing in place writes)
-    CBV_SRV_UAV         m_Dst64UAVTable;     // 64 bit destination key/payload UAVs
-    CBV_SRV_UAV         m_Dst32UAVTable;     // 64 bit destination key/payload UAVs with 32-bit stride
 
     // Resources         for parallel sort algorithm
     Texture             m_FPSScratchBuffer;             // Sort scratch buffer
     CBV_SRV_UAV         m_FPSScratchUAV;                // UAV needed for sort scratch buffer
     Texture             m_FPSReducedScratchBuffer;      // Sort reduced scratch buffer
     CBV_SRV_UAV         m_FPSReducedScratchUAV;         // UAV needed for sort reduced scratch buffer
-
+        
     ID3D12RootSignature* m_pFPSRootSignature            = nullptr;
     ID3D12PipelineState* m_pFPSCountPipeline            = nullptr;
-    ID3D12PipelineState* m_pFPSCountPayload64Pipeline     = nullptr;
     ID3D12PipelineState* m_pFPSCountReducePipeline      = nullptr;
     ID3D12PipelineState* m_pFPSScanPipeline             = nullptr;
     ID3D12PipelineState* m_pFPSScanAddPipeline          = nullptr;
     ID3D12PipelineState* m_pFPSScatterPipeline          = nullptr;
     ID3D12PipelineState* m_pFPSScatterPayloadPipeline   = nullptr;
-    ID3D12PipelineState* m_pFPSScatterPayload64Pipeline   = nullptr;
-
+        
     // Resources for indirect execution of algorithm
     Texture             m_IndirectKeyCounts;            // Buffer to hold num keys for indirect dispatch
     CBV_SRV_UAV         m_IndirectKeyCountsUAV;         // UAV needed for num keys buffer
@@ -140,14 +121,13 @@ private:
     CBV_SRV_UAV         m_IndirectCountScatterArgsUAV;  // UAV needed for count/scatter args buffer
     Texture             m_IndirectReduceScanArgs;       // Buffer to hold dispatch arguments used for Reduce/Scan parts of the algorithm
     CBV_SRV_UAV         m_IndirectReduceScanArgsUAV;    // UAV needed for reduce/scan args buffer
-
+        
     ID3D12CommandSignature* m_pFPSCommandSignature;
     ID3D12PipelineState*    m_pFPSIndirectSetupParametersPipeline = nullptr;
-
+        
     // Resources for verification render
     ID3D12RootSignature* m_pRenderRootSignature = nullptr;
     ID3D12PipelineState* m_pRenderResultVerificationPipeline = nullptr;
-    ID3D12PipelineState* m_pRenderResultVerificationPayloadPipeline = nullptr;
     Texture                 m_Validate4KTexture;
     Texture                 m_Validate2KTexture;
     Texture                 m_Validate1080pTexture;
@@ -163,8 +143,7 @@ private:
 
     // Options for UI and test to run
     int m_UIResolutionSize = 0;
-    int m_UISortPayload = 0; // 0: disable, 1: 32 bit, 2: 64 bit
+    bool m_UISortPayload = false;
+    bool m_UIIndirectSort = false;
     int m_UIVisualOutput = 0;
-    int m_ElementsPerThread = 4;
-    int m_ThreadGroupSize = 256;
 };

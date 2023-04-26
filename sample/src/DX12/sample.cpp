@@ -22,7 +22,6 @@
 
 #include <shellapi.h>
 #include <cassert>
-#include <regex>
 
 //--------------------------------------------------------------------------------------
 //
@@ -109,46 +108,14 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             int keySet = std::stoi(ArgList[CurrentArg + 1]);
             assert(keySet >= 0 && keySet < 3 && "Incorrect usage of -keyset <0-2>");
             FFXParallelSort::OverrideKeySet(keySet);
-            m_bmSettings.m_keySet = keySet;
             CurrentArg += 2;
         }
 
-        // Set payload sort with interleaved 64-bit buffer of key and payload
+        // Set payload sort
         else if (!wideString.compare(L"-payload"))
         {
             FFXParallelSort::OverridePayload();
-            m_bmSettings.m_payload = 1;
             ++CurrentArg;
-        }
-
-        // Set payload sort with separated 32-bit buffer
-        else if (!wideString.compare(L"-payload32"))
-        {
-            FFXParallelSort::OverridePayload32();
-            m_bmSettings.m_payload = 0;
-            ++CurrentArg;
-        }
-
-        // Set block size
-        // Number of elements per thread
-        else if (!wideString.compare(L"-element"))
-        {
-            assert(ArgCount > CurrentArg + 1 && "Incorrect usage of -element <uint>");
-            int nElements = std::stoi(ArgList[CurrentArg + 1]);
-            assert(nElements >= 0 && "Incorrect usage of -element <uint>");
-            FFXParallelSort::OverrideElementPerThread(nElements);
-            m_bmSettings.m_elements = nElements;
-            CurrentArg += 2;
-        }
-        // Thread group size
-        else if (!wideString.compare(L"-threadgroup"))
-        {
-            assert(ArgCount > CurrentArg + 1 && "Incorrect usage of -threadgroup <uint>");
-            int nThreadGroup = std::stoi(ArgList[CurrentArg + 1]);
-            assert(nThreadGroup >= 0 && "Incorrect usage of -threadgroup <uint>");
-            FFXParallelSort::OverrideThreadGroupSize(nThreadGroup);
-            m_bmSettings.m_threadSize = nThreadGroup;
-            CurrentArg += 2;
         }
 
         else
@@ -156,21 +123,6 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             assert(false && "Unsupported command line parameter");
             exit(0);
         }
-    }
-
-    // Change the output csv name accroding to settings
-    if (m_bIsBenchmarking)
-    {
-        json benchmark = m_jsonConfigFile["BenchmarkSettings"];
-        std::string resultsFilename = benchmark.value("resultsFilename", "res.csv");
-        int ext_i = resultsFilename.find_last_of(".");
-        std::string fileName = resultsFilename.substr(0, ext_i);
-        std::string extName = resultsFilename.substr(ext_i, resultsFilename.size() - ext_i);
-        const char* resolutions[] = { "1K", "2K", "4K" };
-        const char* payload[] = { "32bit", "64bit" };
-        resultsFilename = fileName + "_" + resolutions[m_bmSettings.m_keySet] + "_" + payload[m_bmSettings.m_payload] + "_" + std::to_string(m_bmSettings.m_elements) + "_" + std::to_string(m_bmSettings.m_threadSize) + extName;
-        benchmark["resultsFilename"] = resultsFilename;
-        m_jsonConfigFile["BenchmarkSettings"] = benchmark;
     }
 }
 
@@ -189,46 +141,20 @@ void Sample::OnCreate()
     m_pRenderer = new Renderer();
     m_pRenderer->OnCreate(&m_device, &m_swapChain, m_fontSize);
 
-    std::string deviceName;
-    std::string driverVersion;
-    m_device.GetDeviceInfo(&deviceName, &driverVersion);
-
-    // set benchmarking state if enabled
+    // set benchmarking state if enabled 
     if (m_bIsBenchmarking)
     {
+        std::string deviceName;
+        std::string driverVersion;
+        m_device.GetDeviceInfo(&deviceName, &driverVersion);
         BenchmarkConfig(m_jsonConfigFile["BenchmarkSettings"], -1, nullptr, deviceName, driverVersion);
-    }
-    else
-    {
-        // Overwrite the block size according to the GPU. These settings are chosen experimentally.
-        // For the older GPUs than Radeon RX 6800 or other venders' GPUs, we are using '4 * 256' as a block size by default.
-        DXGI_ADAPTER_DESC adapterDescription;
-        m_device.GetAdapter()->GetDesc(&adapterDescription);
-        if (adapterDescription.VendorId == 0x1002u) // AMD GPU
-        {
-            int deviceNumber = std::stoi(std::regex_replace(deviceName, std::regex("\\d+"), "$&", std::regex_constants::format_no_copy));
-            if (deviceNumber >= 6900) // 6900XT or newer
-            {
-                int nElementsPerThread = 4;
-                int nThreadGroupSize = 192;
-                FFXParallelSort::OverrideElementPerThread(nElementsPerThread);
-                FFXParallelSort::OverrideThreadGroupSize(nThreadGroupSize);
-            }
-            else if (deviceNumber >= 6800) // 6800 or 6800XT
-            {
-                int nElementsPerThread = 3;
-                int nThreadGroupSize = 128;
-                FFXParallelSort::OverrideElementPerThread(nElementsPerThread);
-                FFXParallelSort::OverrideThreadGroupSize(nThreadGroupSize);
-            }
-        }
     }
 
     // Init GUI (non gfx stuff)
     ImGUI_Init((void*)m_windowHwnd);
     m_UIState.Initialize();
 
-    OnResize(true);
+    OnResize();
     OnUpdateDisplay();
 }
 
@@ -284,7 +210,7 @@ bool Sample::OnEvent(MSG msg)
 // OnResize
 //
 //--------------------------------------------------------------------------------------
-void Sample::OnResize(bool resizeRender)
+void Sample::OnResize()
 {
     // Destroy resources (if we are not minimized)
     if (m_Width && m_Height && m_pRenderer)
@@ -349,7 +275,7 @@ void Sample::OnRender()
     // Do any start of frame necessities
     BeginFrame();
 
-    ImGUI_UpdateIO(m_Width, m_Height);
+    ImGUI_UpdateIO();
     ImGui::NewFrame();
 
     if (m_bIsBenchmarking)
