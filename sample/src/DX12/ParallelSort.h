@@ -67,7 +67,6 @@ public:
     static void OverrideKeySet(int ResolutionOverride);
     static void OverridePayload();
     static void OverridePayload32();
-    static void OverrideIndirect();
     static void OverrideElementPerThread(int n);
     static void OverrideThreadGroupSize(int n);
     // Temp -- For command line overrides

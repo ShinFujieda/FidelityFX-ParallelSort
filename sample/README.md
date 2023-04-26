@@ -8,7 +8,6 @@ A sample application of the AMD FidelityFX Parallel Sort provides some command l
 - `-keyset <0-2>`: 0 - 1920x1080, 1 - 2560x1440, 2 - 3840x2160
 - `-payload`: Sort with payload using interleaved 64-bit buffer of key and payload
 - `-payload32`: Sort with payload using separated 32-bit buffer
-- `-indirect`: Run with indirect execution
 - `-element <uint>`: Set the number of elements per thread
 - `-threadgroup <uint>`: Set the thread group size
 

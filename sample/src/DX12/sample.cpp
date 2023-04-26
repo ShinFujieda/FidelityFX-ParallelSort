@@ -128,14 +128,6 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
             ++CurrentArg;
         }
 
-        // Set indirect sort
-        else if (!wideString.compare(L"-indirect"))
-        {
-            FFXParallelSort::OverrideIndirect();
-            m_bmSettings.m_indirect = true;
-            ++CurrentArg;
-        }
-
         // Set block size
         // Number of elements per thread
         else if (!wideString.compare(L"-element"))
@@ -175,8 +167,7 @@ void Sample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHe
         std::string extName = resultsFilename.substr(ext_i, resultsFilename.size() - ext_i);
         const char* resolutions[] = { "1K", "2K", "4K" };
         const char* payload[] = { "32bit", "64bit" };
-        resultsFilename = fileName + "_" + resolutions[m_bmSettings.m_keySet] + "_" + payload[m_bmSettings.m_payload] + "_" + std::to_string(m_bmSettings.m_elements) + "_" + std::to_string(m_bmSettings.m_threadSize)
-                        + (m_bmSettings.m_indirect ? "_indirect" : "") + extName;
+        resultsFilename = fileName + "_" + resolutions[m_bmSettings.m_keySet] + "_" + payload[m_bmSettings.m_payload] + "_" + std::to_string(m_bmSettings.m_elements) + "_" + std::to_string(m_bmSettings.m_threadSize) + extName;
         benchmark["resultsFilename"] = resultsFilename;
         m_jsonConfigFile["BenchmarkSettings"] = benchmark;
     }

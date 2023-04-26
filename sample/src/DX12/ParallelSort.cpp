@@ -45,11 +45,6 @@ void FFXParallelSort::OverridePayload32()
 {
     Payload32Override = true;
 }
-bool FFXParallelSort::IndirectOverride = false;
-void FFXParallelSort::OverrideIndirect()
-{
-    IndirectOverride = true;
-}
 int FFXParallelSort::ElementPerThreadOverride = -1;
 void FFXParallelSort::OverrideElementPerThread(int n)
 {
@@ -232,8 +227,6 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         m_UISortPayload = 1;
     if (PayloadOverride)
         m_UISortPayload = 2;
-    if (IndirectOverride)
-        m_UIIndirectSort = true;
     if (ElementPerThreadOverride >= 0)
         m_ElementsPerThread = ElementPerThreadOverride;
     if (ThreadGroupSizeOverride >= 0)
@@ -458,7 +451,7 @@ void FFXParallelSort::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceView
         defines["FFX_PARALLELSORT_ELEMENTS_PER_THREAD"] = std::to_string(m_ElementsPerThread);
         defines["FFX_PARALLELSORT_THREADGROUP_SIZE"] = std::to_string(m_ThreadGroupSize);
 
-        // SetupIndirectParams (indirect only)
+        // SetupIndirectParams
         CompileRadixPipeline("ParallelSortCS.hlsl", &defines, "FPS_SetupIndirectParameters", m_pFPSIndirectSetupParametersPipeline);
 
         // Radix count (sum table generation)
@@ -700,10 +693,7 @@ void FFXParallelSort::CopySourceDataForFrame(ID3D12GraphicsCommandList* pCommand
 // Perform Parallel Sort (radix-based sort)
 void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBenchmarking, float benchmarkTime)
 {
-    bool bIndirectDispatch = m_UIIndirectSort;
-
-    std::string markerText = "FFXParallelSort";
-    if (bIndirectDispatch) markerText += " Indirect";
+    std::string markerText = "FFXParallelSort Indirect";
     UserMarker marker(pCommandList, markerText.c_str());
 
     FFX_ParallelSortCB  constantBufferData = { 0 };
@@ -715,16 +705,7 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
     // Bind the root signature
     pCommandList->SetComputeRootSignature(m_pFPSRootSignature);
 
-    // Fill in the constant buffer data structure (this will be done by a shader in the indirect version)
-    uint32_t NumThreadgroupsToRun;
-    uint32_t NumReducedThreadgroupsToRun;
-    if (!bIndirectDispatch)
-    {
-        uint32_t NumberOfKeys = NumKeys[m_UIResolutionSize];
-        uint32_t blockSize = m_ElementsPerThread * m_ThreadGroupSize;
-        FFX_ParallelSort_SetConstantAndDispatchData(NumberOfKeys, blockSize, m_MaxNumThreadgroups, constantBufferData, NumThreadgroupsToRun, NumReducedThreadgroupsToRun);
-    }
-    else
+    // Fill in the constant buffer data structure by a shader
     {
         struct SetupIndirectCB
         {
@@ -787,11 +768,7 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         pCommandList->SetComputeRoot32BitConstant(2, Shift, 0);
 
         // Copy the data into the constant buffer
-        D3D12_GPU_VIRTUAL_ADDRESS constantBuffer;
-        if (bIndirectDispatch)
-            constantBuffer = m_IndirectConstantBuffer.GetResource()->GetGPUVirtualAddress();
-        else
-            constantBuffer = m_pConstantBufferRing->AllocConstantBuffer(sizeof(FFX_ParallelSortCB), &constantBufferData);
+        D3D12_GPU_VIRTUAL_ADDRESS constantBuffer = m_IndirectConstantBuffer.GetResource()->GetGPUVirtualAddress();
 
         // Bind to root signature
         pCommandList->SetComputeRootConstantBufferView(0, constantBuffer);                      // Constant buffer
@@ -800,17 +777,8 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
 
         // Sort Count
         {
-            // pCommandList->SetPipelineState(m_pFPSCountPipeline);
             pCommandList->SetPipelineState((bHasPayload == 2) ? m_pFPSCountPayload64Pipeline : m_pFPSCountPipeline);
-
-            if (bIndirectDispatch)
-            {
-                pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectCountScatterArgs.GetResource(), 0, nullptr, 0);
-            }
-            else
-            {
-                pCommandList->Dispatch(NumThreadgroupsToRun, 1, 1);
-            }
+            pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectCountScatterArgs.GetResource(), 0, nullptr, 0);
         }
 
         // UAV barrier on the sum table
@@ -822,15 +790,7 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         // Sort Reduce
         {
             pCommandList->SetPipelineState(m_pFPSCountReducePipeline);
-
-            if (bIndirectDispatch)
-            {
-                pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectReduceScanArgs.GetResource(), 0, nullptr, 0);
-            }
-            else
-            {
-                pCommandList->Dispatch(NumReducedThreadgroupsToRun, 1, 1);
-            }
+            pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectReduceScanArgs.GetResource(), 0, nullptr, 0);
 
             // UAV barrier on the reduced sum table
             barriers[0] = CD3DX12_RESOURCE_BARRIER::UAV(ReducedScratchBufferInfo.pResource);
@@ -844,10 +804,6 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
             pCommandList->SetComputeRootDescriptorTable(8, ReducedScratchBufferInfo.resourceGPUHandle);
 
             pCommandList->SetPipelineState(m_pFPSScanPipeline);
-            if (!bIndirectDispatch)
-            {
-                assert(NumReducedThreadgroupsToRun < m_ElementsPerThread * m_ThreadGroupSize && "Need to account for bigger reduced histogram scan");
-            }
             pCommandList->Dispatch(1, 1, 1);
 
             // UAV barrier on the reduced sum table
@@ -860,14 +816,7 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
             pCommandList->SetComputeRootDescriptorTable(9, ReducedScratchBufferInfo.resourceGPUHandle);
 
             pCommandList->SetPipelineState(m_pFPSScanAddPipeline);
-            if (bIndirectDispatch)
-            {
-                pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectReduceScanArgs.GetResource(), 0, nullptr, 0);
-            }
-            else
-            {
-                pCommandList->Dispatch(NumReducedThreadgroupsToRun, 1, 1);
-            }
+            pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectReduceScanArgs.GetResource(), 0, nullptr, 0);
         }
 
         // UAV barrier on the sum table
@@ -883,21 +832,13 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
         if( bHasPayload == 2 ) // 64 bit
         {
             pCommandList->SetComputeRootDescriptorTable(3, ReadBufferInfo->resourceGPUHandle64Bit);      // SrcBuffer
-            pCommandList->SetComputeRootDescriptorTable(6, WriteBufferInfo->resourceGPUHandle64Bit);         // DstBuffer
+            pCommandList->SetComputeRootDescriptorTable(6, WriteBufferInfo->resourceGPUHandle64Bit);     // DstBuffer
         }
 
         // Sort Scatter
         {
             pCommandList->SetPipelineState((bHasPayload == 2) ? m_pFPSScatterPayload64Pipeline : ((bHasPayload == 1) ? m_pFPSScatterPayloadPipeline : m_pFPSScatterPipeline));
-
-            if (bIndirectDispatch)
-            {
-                pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectCountScatterArgs.GetResource(), 0, nullptr, 0);
-            }
-            else
-            {
-                pCommandList->Dispatch(NumThreadgroupsToRun, 1, 1);
-            }
+            pCommandList->ExecuteIndirect(m_pFPSCommandSignature, 1, m_IndirectCountScatterArgs.GetResource(), 0, nullptr, 0);
         }
 
         // Finish doing everything and barrier for the next pass
@@ -913,14 +854,11 @@ void FFXParallelSort::Sort(ID3D12GraphicsCommandList* pCommandList, bool isBench
             std::swap(ReadPayloadBufferInfo, WritePayloadBufferInfo);
     }
 
-    // When we are all done, transition indirect buffers back to UAV for the next frame (if doing indirect dispatch)
-    if (bIndirectDispatch)
-    {
-        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_IndirectCountScatterArgs.GetResource(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_IndirectReduceScanArgs.GetResource(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        barriers[2] = CD3DX12_RESOURCE_BARRIER::Transition(m_IndirectConstantBuffer.GetResource(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        pCommandList->ResourceBarrier(3, barriers);
-    }
+    // When we are all done, transition indirect buffers back to UAV for the next frame
+    barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_IndirectCountScatterArgs.GetResource(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_IndirectReduceScanArgs.GetResource(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    barriers[2] = CD3DX12_RESOURCE_BARRIER::Transition(m_IndirectConstantBuffer.GetResource(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    pCommandList->ResourceBarrier(3, barriers);
 
     // Do we need to validate the results? If so, create a read back buffer to use for this frame
 #ifdef DEVELOPERMODE
@@ -957,7 +895,6 @@ void FFXParallelSort::DrawGui()
         }
         else
             m_UISortPayload = 0;
-        ImGui::Checkbox("Use Indirect Execution", &m_UIIndirectSort);
 #ifdef DEVELOPERMODE
         if (ImGui::Button("Validate Sort Results"))
             m_UIValidateSortResults = true;
